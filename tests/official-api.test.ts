@@ -41,8 +41,8 @@ try {
   }
   for (const operation of ['probe','install','update']) assert.equal((await officialRequest(`library/skills/${operation}`, 'POST', {source:'fixture',name:'fixture'})).method, 'POST');
   assert.equal((await officialRequest('icons/favicon','POST',{url:'https://example.com',name:'fixture'})).method,'POST');
-  assert.equal((await officialRequest('icons/fixture.svg')).uri.startsWith('data:image/svg+xml;base64,'),true);
-  assert.equal((await officialRequest('icons/builtin-openai.svg')).uri.startsWith('data:image/svg+xml;base64,'),true);
+  assert.equal((await officialRequest('icons/fixture.svg')).svg.startsWith('<svg'),true);
+  assert.equal((await officialRequest('icons/builtin-openai.svg')).svg.startsWith('<svg'),true);
   for(const action of ['list','detect']) assert.equal((await officialRequest(`provider/${action}`,'POST',{name:'fixture',key:'fixture',chat:'https://example.com/v1'})).method,'POST');
   const before = calls;
   for (const path of ['library/skill', 'library/skill?name=fixture&url=http://example.com', 'library/skills/install', '../settings', 'state?k=leak', 'quit', 'http://example.com', 'state%3Fk=leak', 'sessions/transcript?agent=x&id=y&path=/etc/passwd', 'usage/quotas/refresh?provider=x&url=http://example.com']) await assert.rejects(officialRequest(path));

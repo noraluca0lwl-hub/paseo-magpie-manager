@@ -49,7 +49,8 @@ export async function officialRequest(path: string, method = "GET", body?: unkno
     if (!['image/svg+xml','image/png','image/jpeg','image/webp','image/x-icon','image/vnd.microsoft.icon'].includes(mime)) throw new Error('图标格式未识别');
     const bytes = Buffer.from(await res.arrayBuffer());
     if (bytes.length > 1024 * 1024) throw new Error('图标超过 1 MB');
-    return { uri: `data:${mime};base64,${bytes.toString('base64')}` };
+    if (mime === 'image/svg+xml') return { svg: bytes.toString('utf8'), mime };
+    return { uri: `data:${mime};base64,${bytes.toString('base64')}`, mime };
   }
   const text = await res.text();
   if (!res.ok) throw new Error(`Magpie ${path} (${res.status}): ${text.slice(0, 500)}`);
