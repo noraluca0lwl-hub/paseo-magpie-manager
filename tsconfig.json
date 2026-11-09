@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "lib": ["ES2022", "DOM"],
+    "paths": {
+      "@getpaseo/plugin": ["./node_modules/@getpaseo/plugin"],
+      "@getpaseo/plugin/server": ["./node_modules/@getpaseo/plugin/dist/server"],
+      "@getpaseo/plugin/client": ["./node_modules/@getpaseo/plugin/dist/client"],
+      "@getpaseo/plugin/client/react-native": ["./node_modules/@getpaseo/plugin/dist/client/react-native"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx"]
+}

@@ -1,0 +1,8 @@
+{
+  "id": "magpie-manager",
+  "name": "Magpie Manager",
+  "icon": "icon.png",
+  "requirements": {
+    "paseo": ">=0.15.0"
+  }
+}
