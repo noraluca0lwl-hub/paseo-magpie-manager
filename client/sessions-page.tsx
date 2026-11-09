@@ -9,7 +9,7 @@ import { SessionDetails, CarryMenu, type DetailSession, type Carry } from './ses
 
 type Session = DetailSession & { id: string; agent: string; name?: string; title?: string; cwd?: string; path?: string; last?: string; start?: string; resume?: string; transcript?: boolean; gateway?: boolean; deletable?: boolean; undeletable?: string; size?: number; cost?: number; tokens?: number; messages?: number; provider?: string; uses_provider?: string; models?: { model?: string; tokens?: number; cost?: number }[]; via?: { model?: string; provider?: string; reasoning?: string }[]; carry?: Carry[]; subagents?: unknown[] };
 type Trash = { key: string; agent?: string; id?: string; title?: string; cwd?: string; deleted?: string };
-type Manage = { sessions?: Session[]; agents?: { agent: string; name?: string; icon?: string; count?: number; deletable?: boolean }[]; agent?: string; trash?: Trash[]; trashDir?: string; recording?: boolean; recorded?: boolean; home?: string; reads?: { asked?: boolean; gateway?: boolean; found?: { agent: string; name?: string; on?: boolean }[] } };
+type Manage = { sessions?: Session[]; agents?: { agent: string; name?: string; icon?: string; count?: number; deletable?: boolean }[]; agent?: string; trash?: Trash[]; trashDir?: string; recording?: boolean; recorded?: boolean; home?: string; reads?: { asked?: boolean; gateway?: boolean; all?: boolean; found?: { agent: string; name?: string; icon?: string; on?: boolean }[] } };
 type Part = { role: string; kind: string; name?: string; text: string; model?: string; cut?: number };
 type Transcript = { parts: Part[]; cut?: boolean };
 type Colors = { text: string; muted: string; card: string; line: string; pill: string; green: string };
@@ -37,7 +37,7 @@ export function SessionsPage({ data, colors: c }: { data: unknown; colors: Color
   const generation = useRef(0);
   useEffect(() => setSnapshot((data as Manage) ?? {}), [data]);
   const sessions = snapshot.sessions ?? [];
-  const agents = snapshot.agents ?? [];
+  const agents = [...(snapshot.agents ?? []), ...(snapshot.reads?.found ?? []).filter(a => !snapshot.agents?.some(existing => existing.agent === a.agent)).map(a => ({ ...a, count: 0 }))];
   const agent = selectedAgent || snapshot.agent || agents[0]?.agent || sessions[0]?.agent || "";
   const text = { color: c.text, fontSize: 14 };
   const note = { color: c.muted, fontSize: 13, lineHeight: 20 };
@@ -46,6 +46,20 @@ export function SessionsPage({ data, colors: c }: { data: unknown; colors: Color
   const button = (label: string, fn: () => void, active = false) => <Pressable accessibilityRole="button" onPress={fn} style={{ paddingVertical: 9, paddingHorizontal: 12, borderRadius: 8, backgroundColor: active ? c.card : c.pill, borderWidth: active ? 1 : 0, borderColor: c.line }}><Text style={text}>{label}</Text></Pressable>;
   const reload = async (name = agent) => { const r = await rpc({ path: `sessions/manage${name ? `?agent=${encodeURIComponent(name)}` : ""}`, method: "GET" }); if (!r.ok) throw new Error(r.error ?? "会话刷新失败"); setSnapshot((r.data as Manage) ?? {}); setNotice("已刷新"); };
   const post = async (path: string, body: unknown) => { const r = await rpc({ path, method: "POST", body }); if (!r.ok) throw new Error(r.error ?? "操作失败"); return r.data; };
+  const autoReadsStarted = useRef(false);
+  useEffect(() => {
+    if (!snapshot.reads || snapshot.reads.gateway || autoReadsStarted.current) return;
+    autoReadsStarted.current = true;
+    let cancelled = false;
+    void (async () => {
+      if (snapshot.reads?.gateway) return;
+      if (snapshot.reads && (!snapshot.reads.all || snapshot.reads.found?.some(a => !a.on))) {
+        await post('sessions/reads', { all: true, agents: Object.fromEntries((snapshot.reads.found ?? []).map(a => [a.agent, true])) });
+        if (!cancelled) await reload();
+      }
+    })().catch(e => { if (!cancelled) setError(String(e)); });
+    return () => { cancelled = true; };
+  }, [snapshot.reads]);
   const open = async (s: Session) => { const g = ++generation.current; setSelected(s); setTranscript(null); setError(""); setLoading(true); try { const r = await rpc({ path: `sessions/transcript?agent=${encodeURIComponent(s.agent)}&id=${encodeURIComponent(s.id)}`, method: "GET" }); if (g !== generation.current) return; if (!r.ok) throw new Error(r.error ?? "会话读取失败"); setTranscript(r.data as Transcript); } catch (e) { if (g === generation.current) setError(String(e)); } finally { if (g === generation.current) setLoading(false); } };
   const close = () => { generation.current++; setSelected(null); setTranscript(null); setError(""); };
   const list = sessions.filter(s => s.agent === agent && `${s.title ?? ""} ${s.cwd ?? ""} ${s.id} ${(s.models ?? []).map(m => m.model).join(" ")}`.toLowerCase().includes(query.trim().toLowerCase()));
@@ -66,7 +80,6 @@ export function SessionsPage({ data, colors: c }: { data: unknown; colors: Color
     </View>
     {agentMenu && <View style={{ ...box, padding: 6, maxWidth: 400 }}><Text style={{ ...note, padding: 10 }}>Agent</Text>{agents.map(a => <Pressable key={a.agent} accessibilityRole="button" accessibilityLabel={`选择 ${a.name || a.agent}`} onPress={() => { setSelectedAgent(a.agent); setAgentMenu(false); setShowTrash(false); setPicked(new Set()); setExpanded(new Set()); void reload(a.agent).catch(e => setError(String(e))); }} style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: 9, backgroundColor: agent === a.agent ? c.pill : c.card }}><Text style={{ ...text, width: 16 }}>{agent === a.agent ? "✓" : ""}</Text><ProviderIcon icon={a.icon} name={a.name || a.agent} color={c.text} size={23}/><Text style={{ ...text, flex: 1, fontWeight: "600" }}>{a.name || a.agent}</Text><Text style={note}>{a.count ?? 0}</Text></Pressable>)}</View>}
     {!showTrash && <>
-      {snapshot.reads && !snapshot.reads.gateway && <View style={box}><Text style={note}>本机 Agent 会话读取：开启后才显示原生项目及迁移入口；网关记录本身没有项目目录。</Text>{snapshot.reads.found?.map(a => <View key={a.agent} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Text style={{ ...text, flex: 1 }}>{a.name || a.agent} · {a.on ? '已开启' : '未开启'}</Text>{button(a.on ? `停止读取 ${a.name || a.agent}` : `允许读取 ${a.name || a.agent}`, () => void post('sessions/reads', { agents: { [a.agent]: !a.on } }).then(() => reload()).catch(e => setError(String(e))))}</View>)}</View>}
       {!!snapshot.recording && <Text style={note}>网关会话记录已开启，文本保存在本机。</Text>}
       {list.length > 0 && <View style={{ ...box, paddingVertical: 12, backgroundColor: c.pill }}><Text style={text}>有 {list.length} 个 {agents.find(a => a.agent === agent)?.name || agent} 会话</Text>{snapshot.agents && agents.length > 1 && <Text style={note}>切换上方 Agent 可查看其他供应商创建的会话。</Text>}</View>}
       {!list.length && <View style={{ ...box, padding: 30 }}><Text style={text}>没有匹配会话</Text><Text style={note}>当前 Agent：{agent || "暂无"}</Text></View>}
