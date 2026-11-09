@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+const path='../client/provider-capabilities.ts';
+const {supportedSetting,capabilityPayload}=await import(path) as typeof import('../client/provider-capabilities');
+assert.equal(supportedSetting('nativeCompaction',{carriesCompaction:false}),false);
+assert.equal(supportedSetting('nativeCompaction',{carriesCompaction:true}),true);
+assert.equal(supportedSetting('insecureTLS',{id:'relay'}),false);
+assert.equal(supportedSetting('insecureTLS',{}),true);
+assert.deepEqual(capabilityPayload({insecureTLS:true,passErrors:true,nativeCompaction:true,imageFilesOff:true,maxRPM:5},{id:'relay'}),{maxRPM:5});
+assert.deepEqual(capabilityPayload({nativeCompaction:false},{id:'relay',carriesCompaction:true}),{nativeCompaction:false});
+console.log('PASS explicit capability flags gate both visible settings and save payloads');

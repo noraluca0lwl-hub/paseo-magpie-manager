@@ -32,7 +32,10 @@ The UI is a native port, not a claim of pixel-identical rendering.
   fallback IDs and behavior flags. The mistakenly added outer per-model editor
   and temporary version label have been removed, including their save staging.
   Existing server model preferences are not explicitly reset by this cleanup.
-  Native capability gating and full Windows parity remain pending.
+  Proxy supports global/direct/custom modes. Explicit Linux capability flags gate
+  TLS bypass, error passthrough, image-file and native-compaction switches in both
+  rendering and saves; hidden flags are omitted instead of overwritten. Full
+  Windows parity and real mutation verification remain pending.
 - Providers: official preset list, custom relay, protocol selection, URL/key,
   model IDs, edit, test, delete confirmation; failed save retains input.
   Custom protocol tabs: OpenAI Chat, Responses, Anthropic, Gemini and System One.
