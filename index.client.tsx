@@ -1,25 +1,37 @@
-import type { PluginClientContext } from "@getpaseo/plugin/client";
+import type { PluginClientContext, PluginSidebarItemProps } from "@getpaseo/plugin/client";
+import { SidebarRow } from "@getpaseo/plugin/client/ui";
 
 import { MagpieManagerPanel } from "./client/panel";
 
+function SidebarItem({ currentScreen, openScreen }: PluginSidebarItemProps) {
+  return (
+    <SidebarRow
+      icon="Sparkles"
+      label="Magpie"
+      active={currentScreen?.screenId === "magpie-manager"}
+      onPress={() => openScreen({ screenId: "magpie-manager" })}
+    />
+  );
+}
+
 export default function contribute(client: PluginClientContext) {
-  // Full screen (works from the sidebar, without opening an agent)
+  // Full screen — reachable from the sidebar without opening an agent
   client.addScreen({
     id: "magpie-manager",
     title: "Magpie",
     Component: MagpieManagerPanel,
   });
 
-  // Sidebar entry — visible in the left rail at the top level
+  // Sidebar entry in the left rail
   client.addSidebarHeaderItem({
     id: "magpie-manager",
     title: "Magpie",
-    Component: ({ openScreen }) => null,
+    Component: SidebarItem,
   });
 
   // Workspace panel inside an agent session
   client.addWorkspacePanel({
-    id: "magpie-manager",
+    id: "magpie-manager-panel",
     title: "Magpie",
     icon: "Sparkles",
     context: "agent",
@@ -30,9 +42,9 @@ export default function contribute(client: PluginClientContext) {
     title: "Magpie Manager",
     icon: "Sparkles",
     keywords: ["magpie", "provider", "relay", "中转"],
-    context: "agent",
-    onSelect: ({ openPanel }) => {
-      openPanel("magpie-manager");
+    context: "global",
+    onSelect: (ctx) => {
+      ctx.openScreen({ screenId: "magpie-manager" });
     },
   });
   return () => {};
