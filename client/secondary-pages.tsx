@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { RoutingPage } from "./routing-page";
 import { SessionsPage } from "./sessions-page";
 import { LibraryPage } from "./library-page";
+import { UsagePage } from './usage-page';
 import { GatewayPage } from "./gateway-page";
 
 type RecordValue = Record<string, unknown>;
@@ -10,6 +11,7 @@ const obj = (v: unknown): RecordValue => v && typeof v === "object" && !Array.is
 const arr = (v: unknown): RecordValue[] => Array.isArray(v) ? v.map(obj) : [];
 const say = (v: unknown) => typeof v === "string" || typeof v === "number" ? String(v) : "";
 export function SecondaryPage({ page, data, colors: c, act }: {
+  usageTab?: string;
   page: string; data: unknown; colors: { text: string; muted: string; card: string; line: string; pill: string; green: string };
   act: (path: string, body: unknown) => Promise<void>;
 }) {
@@ -33,7 +35,8 @@ export function SecondaryPage({ page, data, colors: c, act }: {
   if (page === "routing") return <RoutingPage data={data} colors={c} act={act} />;
   if (page === "legacy-routing") return <View style={{ gap: 16 }}>{tabs([["agents", "路由组"], ["templates", "模板"]])}{list(arr(tab === "templates" ? d.templates : d.groups), v => say(v.name || v.id || obj(v.group).name || v.kind), v => say(v.why) || `${say(v.routing)} · ${Array.isArray(v.members) ? v.members.length : 0} 个成员`, tab === "templates" ? "暂无模板" : "暂无路由组")}<Text style={note}>当前为路由组和模板列表；路由追踪、规则编辑尚未接入。</Text></View>;
   if (page === "gateway") return <GatewayPage data={data} colors={c} />;
-  if (page === "usage") {
+  if (page === 'usage') return <UsagePage data={data} colors={c} selectedTab={usageTab}/>;
+  if (page === "legacy-usage") {
     const rows = Array.isArray(data) ? arr(data) : arr(d.quotas || d.accounts);
     return <View style={{ gap: 16 }}>{stats([["配额条目", rows.length]])}{!rows.length && empty("暂无配额数据", "添加供应商后，此处显示订阅窗口或账户余额。")}{rows.map((v, i) => <View key={`${say(v.provider)}:${say(v.user)}:${i}`} style={{ ...card, padding: 18, gap: 12 }}><Text style={{ ...label, fontWeight: "600" }}>{say(v.name || v.provider)}</Text><Text style={note}>{say(v.plan || v.kind)} {say(v.user)}</Text>{!!v.balance && <Text style={{ ...label, fontSize: 24 }}>{say(v.balance)}</Text>}{arr(v.windows).map((w, j) => <View key={j} style={{ gap: 6 }}><Text style={note}>{say(w.name)} · {w.unlimited ? "不限量" : say(w.display) || `已用 ${say(w.used)}% · 剩余 ${say(w.remaining)}%`}</Text><View style={{ height: 5, backgroundColor: c.pill, borderRadius: 3 }}><View style={{ height: 5, width: `${Math.max(0, Math.min(100, Number(w.used) || 0))}%`, backgroundColor: c.green, borderRadius: 3 }} /></View>{!!w.resetsAt && <Text style={note}>重置：{say(w.resetsAt)}</Text>}</View>)}{!!v.error && <Text style={{ color: "#d54949" }}>{say(v.error)}</Text>}<Pressable disabled={refreshing !== null} onPress={async () => { const id = say(v.provider); setRefreshing(`${id}:${i}`); setOperationError(""); try { await act(`usage/quotas/refresh?provider=${encodeURIComponent(id)}${v.user ? `&user=${encodeURIComponent(say(v.user))}` : ""}`, {}); } catch (e) { setOperationError(String(e)); } finally { setRefreshing(null); } }} style={{ backgroundColor: c.pill, borderRadius: 7, padding: 10 }}><Text style={label}>{refreshing === `${say(v.provider)}:${i}` ? "刷新中…" : "刷新此账户"}</Text></Pressable></View>)}{!!operationError && <Text style={{ color: "#d54949" }}>{operationError}</Text>}<Text style={note}>用量统计图和请求明细尚未接入。</Text></View>;
   }

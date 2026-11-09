@@ -36,7 +36,7 @@ const nav: { group: string; items: { id: Page; label: string; icon: { svg: strin
   { group: "观测", items: [{ id: "usage", label: "用量", icon: I_usage }, { id: "masking", label: "脱敏", icon: I_masking }] },
   { group: "扩展", items: [{ id: "plugins", label: "插件", icon: I_plugins }] },
 ];
-const endpoints: Partial<Record<Page, string>> = { sessions: "sessions/manage", library: "library", routing: "groups", gateway: "providers", usage: "usage/quotas", masking: "masking/summary", plugins: "plugins", settings: "settings" };
+const endpoints: Partial<Record<Page, string>> = { sessions: "sessions/manage", library: "library", routing: "groups", gateway: "providers", usage: "usage", masking: "masking/summary", plugins: "plugins", settings: "settings" };
 const freshForm = { id: "", name: "", key: "", url: "", protocol: "chat", preset: "", models: "", icon: "", iconFrom: "" };
 
 export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme">) {
@@ -44,6 +44,7 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
   const { width } = useWindowDimensions();
   const compact = width < 700;
   const [page, setPage] = useState<Page>("agents");
+  const [usageTab, setUsageTab] = useState('overview');
   const [drawer, setDrawer] = useState(false);
   const preferences = useRpc(panelPreferences);
   const [appearance, setAppearance] = useState<"system" | "light" | "dark">("system");
@@ -145,7 +146,7 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
   const sidebar = <View style={{ flex: 1, backgroundColor: c.bg, borderRightWidth: 1, borderRightColor: c.line }}>
     <View style={{ height: 46, paddingHorizontal: 18, flexDirection: "row", alignItems: "center", gap: 8 }}><Icon icon={officialIcons.magpie} size={18} color={c.text} /><Text style={text}>magpie</Text>{compact && button("关闭", () => setDrawer(false))}</View>
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 10, paddingBottom: 20 }}>
-      {nav.map(g => <View key={g.group}><Text style={{ ...muted, paddingHorizontal: 8, paddingTop: 17, paddingBottom: 6, fontSize: 12 }}>{g.group}</Text>{g.items.map(i => <Pressable key={i.id} onPress={() => go(i.id)} accessibilityRole="button" accessibilityState={{ selected: page === i.id }} style={{ height: 38, borderRadius: 7, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: page === i.id ? c.card : "transparent", borderWidth: page === i.id ? 1 : 0, borderColor: c.line }}><Icon icon={i.icon} size={16} color={page === i.id ? c.text : c.muted} /><Text style={text}>{i.label}</Text></Pressable>)}</View>)}
+      {nav.map(g => <View key={g.group}><Text style={{ ...muted, paddingHorizontal: 8, paddingTop: 17, paddingBottom: 6, fontSize: 12 }}>{g.group}</Text>{g.items.map(i => <View key={i.id}><Pressable onPress={() => go(i.id)} accessibilityRole="button" accessibilityState={{ selected: page === i.id }} style={{ height: 38, borderRadius: 7, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: page === i.id ? c.card : "transparent", borderWidth: page === i.id ? 1 : 0, borderColor: c.line }}><Icon icon={i.icon} size={16} color={page === i.id ? c.text : c.muted} /><Text style={text}>{i.label}</Text></Pressable>{i.id === 'usage' && page === 'usage' && <View style={{marginLeft:18,paddingLeft:10,borderLeftWidth:1,borderColor:c.line}}>{[['overview','概览'],['requests','请求'],['sessions','会话'],['context','上下文']].map(([id,label])=><Pressable key={id} accessibilityRole="button" accessibilityLabel={`用量${label}`} onPress={()=>{setUsageTab(id);setDrawer(false);}} style={{padding:9,borderRadius:7,backgroundColor:usageTab===id?c.pill:'transparent'}}><Text style={text}>{label}</Text></Pressable>)}</View>}</View>)}</View>)}
     </ScrollView>
     <Pressable onPress={() => go("settings")} style={{ ...row, borderTopWidth: 1, borderTopColor: c.line }}><Icon icon={officialIcons.settings} size={16} color={c.muted} /><Text style={text}>设置</Text></Pressable>
   </View>;
@@ -187,7 +188,7 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
         {endpoints[page] && <>
           {!!sectionError && <Text style={{ color: c.red }}>{sectionError}</Text>}
           {page === "settings" && <View style={{ ...card, ...row }}><Text style={{ ...text, flex: 1 }}>插件外观</Text>{([ ["system", "跟随 Paseo"], ["light", "浅色"], ["dark", "暗色"] ] as const).map(([value, title]) => <View key={value}>{button(`${appearance === value ? "● " : ""}${title}`, () => void saveAppearance(value))}</View>)}</View>}
-          {!sectionError && <SecondaryPage key={page} page={page} data={section} colors={c} act={secondaryAct} />}
+          {!sectionError && <SecondaryPage key={page} page={page} data={section} colors={c} usageTab={usageTab} act={secondaryAct} />}
         </>}
       </ScrollView>
     </View>

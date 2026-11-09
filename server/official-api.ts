@@ -22,7 +22,8 @@ function allowed(path: string, method: string) {
   const [base, query = ""] = path.split("?");
   if (path.split("?").length > 2) return false;
   const params = new URLSearchParams(query);
-  const queryKeys = base === "library/skill" ? ["name", "file"] : base === "gateway/call" ? ["id"] : ["sessions/transcript", "sessions/manage", "sessions/search", "sessions/markdown", "sessions/export"].includes(base) ? ["agent", "id", "q"] : base === "usage/quotas/refresh" ? ["provider", "user"] : [];
+  const usageRead = ['usage', 'usage/requests', 'usage/heatmap', 'context'].includes(base);
+  const queryKeys = usageRead ? ['period', 'offset', 'limit'] : base === "library/skill" ? ["name", "file"] : base === "gateway/call" ? ["id"] : ["sessions/transcript", "sessions/manage", "sessions/search", "sessions/markdown", "sessions/export"].includes(base) ? ["agent", "id", "q"] : base === "usage/quotas/refresh" ? ["provider", "user"] : [];
   if ([...params.keys()].some(key => !queryKeys.includes(key))) return false;
   if (query && !queryKeys.length) return false;
   if (method === 'GET' && /^icons\/[a-zA-Z0-9_.-]+$/.test(base)) return true;
@@ -30,6 +31,7 @@ function allowed(path: string, method: string) {
   if (base === "gateway/call") return method === "GET" && /^\d+$/.test(params.get("id") ?? "");
   if (base === "sessions/transcript" || base === "sessions/markdown") return method === "GET" && !!params.get("agent") && !!params.get("id");
   if (base === "sessions/export") return method === "POST" && !!params.get("agent") && !!params.get("id");
+  if (usageRead) return method === 'GET';
   if (base === 'library/rtk') return method === 'GET' || method === 'POST';
   if (/^library\/rtk\/(install|upgrade|path)$/.test(base)) return method === 'POST';
   if (base === "sessions/manage") return method === "GET";
