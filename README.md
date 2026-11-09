@@ -20,6 +20,11 @@ The UI is a native port, not a claim of pixel-identical rendering.
   confirmation, profiles save/use.
 - Providers: official preset list, custom relay, protocol selection, URL/key,
   model IDs, edit, test, delete confirmation; failed save retains input.
+  Custom protocol tabs: OpenAI Chat, Responses, Anthropic, Gemini and System One.
+  Unsaved model-list fetch with selection, protocol detection with optional test
+  model, and key show/hide are wired to official endpoints. Detection results
+  currently render as JSON rather than the Windows result grid. Advanced/more
+  endpoint fields, image picker and built-in icon picker remain pending.
   Provider icons render from official assets or stored pictures via authenticated
   server RPC as data URIs (no phone-localhost URLs). Custom relays have a name
   tile fallback, icon preview and explicit site-favicon fetch/reset controls.

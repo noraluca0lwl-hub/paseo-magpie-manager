@@ -14,7 +14,7 @@ import { I_agents, I_sessions, I_providers, I_routing, I_gateway, I_usage, I_mas
 type Option = { value: string; label?: string; note?: string; group?: string };
 type Field = { key: string; label: string; value: string; options: Option[] };
 type Agent = { id: string; name: string; icon?: string; wired?: boolean; path: string; fields: Field[]; models?: number };
-type Provider = { icon?: string; iconFrom?: string; id: string; name: string; chat?: string; anthropic?: string; responses?: string; models?: unknown[]; key?: string; preset?: string };
+type Provider = { icon?: string; iconFrom?: string; id: string; name: string; chat?: string; anthropic?: string; responses?: string; gemini?:string; decide?:string; models?: unknown[]; key?: string; preset?: string };
 type State = { agents: Agent[]; profiles: { name: string }[]; settings?: Record<string, unknown> };
 type Providers = { providers: Provider[]; presets: (Provider & { kind?: string })[] };
 type Page = "agents" | "sessions" | "library" | "providers" | "routing" | "gateway" | "usage" | "masking" | "plugins" | "settings";
@@ -55,6 +55,7 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
   const [query, setQuery] = useState("");
   const [form, setForm] = useState(freshForm);
   const [editing, setEditing] = useState(false);
+  const [showKey,setShowKey]=useState(false);const [detectModel,setDetectModel]=useState('');const [providerResult,setProviderResult]=useState('');const [listedModels,setListedModels]=useState<{id:string;name?:string}[]>([]);
   const [confirmDelete, setConfirmDelete] = useState<Provider | null>(null);
   const [confirmDisconnect, setConfirmDisconnect] = useState<Agent | null>(null);
   const [profileName, setProfileName] = useState<string | null>(null);
@@ -85,6 +86,16 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
     if (busy) return;
     setBusy(true); setError("");
     try { await call(path, body); after?.(); await refresh(); } catch (e) { setError(String(e)); } finally { setBusy(false); }
+  };
+  const providerInspect = async (list:boolean) => {
+    const snapshot=form;if(!snapshot.url.trim()){setError('先填写 Base URL');return;}
+    if(list&&snapshot.id&&!snapshot.key.trim()){setError('获取未保存模型列表需要输入 API Key；原密钥保持不变');return;}
+    setBusy(true);setError('');setProviderResult('');
+    try {const body:Record<string,unknown>={id:snapshot.id,name:snapshot.name,key:snapshot.key,preset:snapshot.preset,[snapshot.protocol]:snapshot.url};
+      if(!list){body.base=snapshot.url;body.model=detectModel;body.picked=snapshot.models.split(',').map(v=>v.trim()).filter(Boolean);if(snapshot.protocol!=='decide')body[snapshot.protocol]='';}
+      const result=await call(list?'provider/list':'provider/detect',body) as {models?:{id:string;name?:string}[];results?:unknown[]};
+      if(list){setListedModels(result.models??[]);setProviderResult(`获取到 ${result.models?.length??0} 个模型；勾选后保存。`);}else setProviderResult(JSON.stringify(result.results??result,null,2));
+    }catch(e){setError(String(e));}finally{setBusy(false);}
   };
   const secondaryAct = async (path: string, body: unknown) => {
     if (busy) throw new Error("已有操作正在执行");
@@ -145,8 +156,8 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flexWrap: "wrap" }}><Text style={{ ...muted, fontWeight: "600" }}>方案</Text>{state?.profiles.length ? state.profiles.map(p => button(p.name, () => void act("profile/use", { name: p.name }))) : <Text style={muted}>还没有 · 保存当前设置，之后一键切回</Text>}{button("＋ 保存当前", () => setProfileName(""))}</View>
         </>}
         {page === "providers" && <>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}><TextInput accessibilityLabel="查找供应商" style={{ ...input, flex: 1 }} placeholder="查找供应商" placeholderTextColor={c.muted} value={search} onChangeText={setSearch} />{button("＋ 添加供应商", () => { setForm(freshForm); setEditing(true); })}</View>
-          <View style={card}>{vendors.providers.filter(p => `${p.name} ${p.id}`.toLowerCase().includes(search.toLowerCase())).map((p, i) => <View key={p.id} style={{ ...row, borderTopWidth: i ? 1 : 0, borderTopColor: c.line }}><ProviderIcon icon={p.icon} name={p.name||p.id} color={c.text}/><View style={{ flex: 1, minWidth: 120 }}><Text style={{ ...text, fontWeight: "600" }}>{p.name || p.id}</Text><Text numberOfLines={1} style={muted}>{p.chat || p.anthropic || p.responses || p.preset || p.id}</Text></View>{button("编辑", () => { setForm({ ...freshForm, id: p.id, name: p.name, icon: p.icon??'', iconFrom:p.iconFrom??'', url: p.chat || p.anthropic || p.responses || "", protocol: p.anthropic ? "anthropic" : p.responses ? "responses" : "chat", preset: p.preset ?? "" }); setEditing(true); })}{button("测试", () => void act("provider/test", { id: p.id }))}{button("删除", () => setConfirmDelete(p), true)}</View>)}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}><TextInput accessibilityLabel="查找供应商" style={{ ...input, flex: 1 }} placeholder="查找供应商" placeholderTextColor={c.muted} value={search} onChangeText={setSearch} />{button("＋ 添加供应商", () => { setForm(freshForm); setShowKey(false);setDetectModel('');setProviderResult('');setListedModels([]);setEditing(true); })}</View>
+          <View style={card}>{vendors.providers.filter(p => `${p.name} ${p.id}`.toLowerCase().includes(search.toLowerCase())).map((p, i) => <View key={p.id} style={{ ...row, borderTopWidth: i ? 1 : 0, borderTopColor: c.line }}><ProviderIcon icon={p.icon} name={p.name||p.id} color={c.text}/><View style={{ flex: 1, minWidth: 120 }}><Text style={{ ...text, fontWeight: "600" }}>{p.name || p.id}</Text><Text numberOfLines={1} style={muted}>{p.chat || p.anthropic || p.responses || p.gemini || p.decide || p.preset || p.id}</Text></View>{button("编辑", () => { setForm({ ...freshForm, id: p.id, name: p.name, icon: p.icon??'', iconFrom:p.iconFrom??'', url: p.chat || p.anthropic || p.responses || p.gemini || p.decide || "", protocol: p.anthropic ? "anthropic" : p.responses ? "responses" : p.gemini?'gemini':p.decide?'decide':"chat", preset: p.preset ?? "" });setShowKey(false);setDetectModel('');setProviderResult('');setListedModels([]); setEditing(true); })}{button("测试", () => void act("provider/test", { id: p.id }))}{button("删除", () => setConfirmDelete(p), true)}</View>)}
             {!vendors.providers.length && !loading && <View style={{ padding: 40, gap: 10, alignItems: "center" }}><Text style={text}>尚未添加供应商</Text><Text style={muted}>添加订阅供应商或自定义中转，配置 URL 和 API Key。</Text></View>}
           </View>
         </>}
@@ -166,15 +177,19 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
       {button('获取站点图标',()=>{const current=form;if(!current.url.trim()){setError('先填写 Base URL');return;}setBusy(true);setError('');void call('icons/favicon',{url:current.url,name:current.name}).then(value=>{const icon=(value as {icon?:string}).icon;if(!icon)throw new Error('站点未返回图标');setForm(previous=>previous.url===current.url&&previous.name===current.name?{...previous,icon,iconFrom:''}:previous);}).catch(e=>setError(String(e))).finally(()=>setBusy(false));})}
       {button('使用名称默认图标',()=>setForm({...form,icon:'',iconFrom:''}))}
       <Text style={muted}>名称</Text><TextInput value={form.name} onChangeText={v => setForm({ ...form, name: v })} style={input} />
-      <Text style={muted}>API Key {form.id ? "（留空保留原密钥）" : ""}</Text><TextInput value={form.key} onChangeText={v => setForm({ ...form, key: v })} style={input} autoCapitalize="none" autoCorrect={false} secureTextEntry />
-      <Text style={muted}>接口协议</Text><View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>{["chat", "anthropic", "responses"].map(p => button(`${form.protocol === p ? "● " : ""}${p}`, () => setForm({ ...form, protocol: p })))}</View>
+      <Text style={muted}>API Key {form.id ? "（留空保留原密钥）" : ""}</Text><TextInput accessibilityLabel="供应商 API 密钥" value={form.key} onChangeText={v => setForm({ ...form, key: v })} style={input} autoCapitalize="none" autoCorrect={false} secureTextEntry={!showKey} />{button(showKey?'隐藏密钥':'显示密钥',()=>setShowKey(!showKey))}
+      <Text style={muted}>接口协议</Text><View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>{["chat", "responses", "anthropic", "gemini", "decide"].map(p => button(`${form.protocol === p ? "● " : ""}${({chat:'OpenAI 兼容',responses:'OpenAI Responses',anthropic:'Anthropic 兼容',gemini:'Gemini 兼容',decide:'System One'} as Record<string,string>)[p]}`, () => setForm({ ...form, protocol: p })))}</View>
       <Text style={muted}>Base URL</Text><TextInput value={form.url} onChangeText={v => setForm({ ...form, url: v })} style={input} autoCapitalize="none" autoCorrect={false} placeholder="https://api.example.com/v1" placeholderTextColor={c.muted} />
+      <TextInput accessibilityLabel="协议检测模型" placeholder="试用模型；留空从供应商列表选择" placeholderTextColor={c.muted} value={detectModel} onChangeText={setDetectModel} style={input}/>
+      <View style={{flexDirection:'row',gap:8,flexWrap:'wrap'}}>{button('检测协议',()=>void providerInspect(false))}{button('获取模型',()=>void providerInspect(true))}</View>
+      {!!providerResult&&<Text selectable style={muted}>{providerResult}</Text>}
+      {listedModels.map(m=><View key={m.id} style={{flexDirection:'row',gap:8,alignItems:'center'}}><Text style={{...text,flex:1}}>{m.name||m.id}</Text><Switch accessibilityLabel={`选择模型 ${m.id}`} value={form.models.split(',').map(v=>v.trim()).includes(m.id)} onValueChange={on=>setForm(v=>({...v,models:(on?[...new Set([...v.models.split(',').map(x=>x.trim()).filter(Boolean),m.id])]:v.models.split(',').map(x=>x.trim()).filter(x=>x&&x!==m.id)).join(', ')}))}/></View>)}
       <Text style={muted}>模型 ID（逗号分隔；编辑留空保留原列表）</Text><TextInput value={form.models} onChangeText={v => setForm({ ...form, models: v })} style={input} autoCapitalize="none" />
       {button(busy ? "保存中…" : "保存", () => {
         if (!form.name.trim() || (!form.id && !form.key.trim())) { setError("名称和新供应商 API Key 为必填项"); return; }
         try { const u = new URL(form.url); if (!["https:", "http:"].includes(u.protocol)) throw new Error(); } catch { setError("请填写有效的 HTTP 或 HTTPS Base URL"); return; }
         const existing = vendors.providers.find(p => p.id === form.id);
-        void act("provider/save", { ...(existing ?? {}), ...(existing ? { chat: "", anthropic: "", responses: "" } : {}), id: form.id || form.name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-") || "relay", name: form.name.trim(), icon:form.icon, iconFrom:form.iconFrom, key: form.key.trim(), preset: form.preset, [form.protocol]: form.url.trim(), new: !form.id, ...(form.models.trim() ? { models: form.models.split(",").map(s => s.trim()).filter(Boolean) } : {}) }, () => { setEditing(false); setForm(freshForm); });
+        void act("provider/save", { ...(existing ?? {}), ...(existing ? { chat: "", anthropic: "", responses: "", gemini:'', decide:'' } : {}), id: form.id || form.name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-") || "relay", name: form.name.trim(), icon:form.icon, iconFrom:form.iconFrom, key: form.key.trim(), preset: form.preset, [form.protocol]: form.url.trim(), new: !form.id, ...(form.models.trim() ? { models: form.models.split(",").map(s => s.trim()).filter(Boolean) } : {}) }, () => { setEditing(false); setForm(freshForm); });
       })}
       {!!error && <Text selectable style={{ color: c.red }}>{error}</Text>}
     </>)}
