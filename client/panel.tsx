@@ -4,7 +4,7 @@
  * light/dark tokens, 12px list cards, 40px rows, 13px body, pill controls,
  * quiet text buttons, indigo accent.
  */
-import { type PluginAgentPanelProps, useRpc } from "@getpaseo/plugin/client";
+import { type PluginAgentPanelProps, type PluginScreenProps, useRpc } from "@getpaseo/plugin/client";
 import { useToast } from "@getpaseo/plugin/client/ui";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -34,6 +34,8 @@ function isDark(hex: string): boolean {
   return (r * 299 + g * 587 + b * 114) / 1000 < 128;
 }
 
+type PluginScreenPropsLike = Pick<PluginAgentPanelProps, "theme"> & Partial<PluginScreenProps>;
+
 function tokens(theme: PluginAgentPanelProps["theme"]) {
   const dark = isDark(theme.colors.surface0);
   return {
@@ -62,8 +64,9 @@ type Agent = { name: string; detail: string; detected: boolean };
 type Group = { id: string; raw: string };
 type PageView = "providers" | "agents" | "groups" | "quota";
 
-export function MagpieManagerPanel(props: PluginAgentPanelProps) {
-  const t = tokens(props.theme);
+export function MagpieManagerPanel(props: PluginAgentPanelProps | PluginScreenPropsLike) {
+  const theme = props.theme;
+  const t = tokens(theme);
   const toast = useToast();
   const list = useRpc(listProviders);
   const add = useRpc(addProvider);
