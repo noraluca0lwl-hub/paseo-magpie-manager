@@ -4,7 +4,9 @@
   "version": "0.1.0",
   "license": "MIT",
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types tests/official-api.test.ts && node --experimental-strip-types tests/gateway-data.test.ts && node --experimental-strip-types tests/provider-capabilities.test.ts && node --experimental-strip-types tests/provider-form.test.ts",
+    "test:live": "node --experimental-strip-types tests/live-readonly.ts"
   },
   "devDependencies": {
     "@getpaseo/plugin": "0.15.0",

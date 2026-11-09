@@ -45,6 +45,12 @@ try {
   assert.equal((await officialRequest('icons/builtin-openai.svg')).svg.startsWith('<svg'),true);
   for(const action of ['list','detect']) assert.equal((await officialRequest(`provider/${action}`,'POST',{name:'fixture',key:'fixture',chat:'https://example.com/v1'})).method,'POST');
   await officialRequest('gateway/call?id=1');
+  await officialRequest('gateway/call?route=42');
+  await officialRequest('gateway/trace?after=0');
+  await officialRequest('gateway/history?day=2026-11-09');
+  await officialRequest('gateway/history?day=');
+  for (const action of ['found', 'skip']) assert.equal((await officialRequest(`groups/${action}`, 'POST', {on:true,skip:[]})).method, 'POST');
+  for (const path of ['gateway/call?id=1&route=2','gateway/call?route=abc','gateway/history?day=bad','gateway/history?day=2026-11-09&url=x','gateway/trace?after=bad']) await assert.rejects(officialRequest(path));
   await officialRequest('caller-keys');
   for (const action of ['add-key','rename-key','on-key','off-key','copy-key','rotate-key','remove-key']) assert.equal((await officialRequest(`caller-keys/${action}`, 'POST', {key:'fixture'})).method, 'POST');
   assert.equal((await officialRequest('settings/lan', 'POST', {on:false})).method, 'POST');

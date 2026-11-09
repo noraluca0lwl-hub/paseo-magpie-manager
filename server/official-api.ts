@@ -23,12 +23,14 @@ function allowed(path: string, method: string) {
   if (path.split("?").length > 2) return false;
   const params = new URLSearchParams(query);
   const usageRead = ['usage', 'usage/requests', 'usage/heatmap', 'context'].includes(base);
-  const queryKeys = usageRead ? ['period', 'offset', 'limit', 'agent', 'provider', 'purpose', 'failed', 'retried', 'q', 'via'] : base === "library/skill" ? ["name", "file"] : base === "gateway/call" ? ["id"] : ["sessions/transcript", "sessions/manage", "sessions/search", "sessions/markdown", "sessions/export"].includes(base) ? ["agent", "id", "q"] : base === "usage/quotas/refresh" ? ["provider", "user"] : [];
+  const queryKeys = usageRead ? ['period', 'offset', 'limit', 'agent', 'provider', 'purpose', 'failed', 'retried', 'q', 'via'] : base === "library/skill" ? ["name", "file"] : base === "gateway/history" ? ["day"] : base === "gateway/call" ? ["id", "route"] : base === "gateway/trace" ? ["after", "wait"] : ["sessions/transcript", "sessions/manage", "sessions/search", "sessions/markdown", "sessions/export"].includes(base) ? ["agent", "id", "q"] : base === "usage/quotas/refresh" ? ["provider", "user"] : [];
   if ([...params.keys()].some(key => !queryKeys.includes(key))) return false;
   if (query && !queryKeys.length) return false;
   if (method === 'GET' && /^icons\/[a-zA-Z0-9_.-]+$/.test(base)) return true;
   if (base === "library/skill") return method === "GET" && !!params.get("name");
-  if (base === "gateway/call") return method === "GET" && /^\d+$/.test(params.get("id") ?? "");
+  if (base === "gateway/history") return method === "GET" && (!params.get("day") || /^\d{4}-\d{2}-\d{2}$/.test(params.get("day")!));
+  if (base === "gateway/call") return method === "GET" && params.has("id") !== params.has("route") && /^\d+$/.test(params.get("id") ?? params.get("route") ?? "");
+  if (base === "gateway/trace") return method === "GET" && /^\d+$/.test(params.get("after") ?? "0") && /^(0|1)$/.test(params.get("wait") ?? "0");
   if (base === "sessions/transcript" || base === "sessions/markdown") return method === "GET" && !!params.get("agent") && !!params.get("id");
   if (base === "sessions/export") return method === "POST" && !!params.get("agent") && !!params.get("id");
   if (usageRead) return method === 'GET';
@@ -38,7 +40,7 @@ function allowed(path: string, method: string) {
   if (base === "sessions/search") return method === "GET" && !!params.get("agent") && !!params.get("q");
   if (base === "usage/quotas/refresh") return method === "POST" && !!params.get("provider");
   return method === "GET" ? reads.has(base) :
-    /^(sessions\/(reads|recording|delete|restore|purge|export|terminal|carry|relocate-claude)|caller-keys\/(add-key|rename-key|on-key|off-key|copy-key|rotate-key|remove-key)|settings\/lan|icons\/(favicon|url)|set|agents\/rescan|agents\/(connect|disconnect)\/[a-z0-9_-]+|provider\/(save|delete|test|balance|list|models|detect|on|off)|groups\/(save|delete|switch|template)|profile\/(save|use)|library\/(instructions\/save|servers\/(save|agents|remove|import)|hooks\/(save|agents|remove)|subagents\/(save|agents|remove)|skills\/(save|agents|remove|probe|install|update|import|import-all|remove-found))|settings)$/.test(base);
+    /^(sessions\/(reads|recording|delete|restore|purge|export|terminal|carry|relocate-claude)|caller-keys\/(add-key|rename-key|on-key|off-key|copy-key|rotate-key|remove-key)|settings\/lan|icons\/(favicon|url)|set|agents\/rescan|agents\/(connect|disconnect)\/[a-z0-9_-]+|provider\/(save|delete|test|balance|list|models|detect|on|off)|groups\/(save|delete|switch|template|found|skip)|profile\/(save|use)|library\/(instructions\/save|servers\/(save|agents|remove|import)|hooks\/(save|agents|remove)|subagents\/(save|agents|remove)|skills\/(save|agents|remove|probe|install|update|import|import-all|remove-found))|settings)$/.test(base);
 }
 export async function officialRequest(path: string, method = "GET", body?: unknown) {
   if (!allowed(path, method)) throw new Error("此接口未开放给插件");

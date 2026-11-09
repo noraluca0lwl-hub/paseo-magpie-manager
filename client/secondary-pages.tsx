@@ -10,10 +10,11 @@ type RecordValue = Record<string, unknown>;
 const obj = (v: unknown): RecordValue => v && typeof v === "object" && !Array.isArray(v) ? v as RecordValue : {};
 const arr = (v: unknown): RecordValue[] => Array.isArray(v) ? v.map(obj) : [];
 const say = (v: unknown) => typeof v === "string" || typeof v === "number" ? String(v) : "";
-export function SecondaryPage({ page, data, colors: c, act }: {
+export function SecondaryPage({ page, data, colors: c, act, read, usageTab }: {
   usageTab?: string;
   page: string; data: unknown; colors: { text: string; muted: string; card: string; line: string; pill: string; green: string };
   act: (path: string, body: unknown) => Promise<void>;
+  read?: (path: string) => Promise<unknown>;
 }) {
   const [tab, setTab] = useState("agents");
   const [query, setQuery] = useState("");
@@ -32,7 +33,7 @@ export function SecondaryPage({ page, data, colors: c, act }: {
   if (page === "sessions") return <SessionsPage data={data} colors={c} />;
   if (page === "library") return <LibraryPage data={data} colors={c} act={act} />;
   if (page === "legacy-library") return <View style={{ gap: 16 }}>{tabs([["agents", "Agent"], ["servers", "MCP 服务器"], ["skills", "技能"], ["hooks", "Hooks"], ["subagents", "子 Agent"]])}{list(arr(d[tab]), v => say(v.name || v.id), v => [v.instructions, v.skills, v.command, v.description, v.path].map(say).filter(Boolean).join("\n"), "暂无项目")}<Text style={note}>当前为资源列表；编辑、分发与安装操作尚未接入。</Text></View>;
-  if (page === "routing") return <RoutingPage data={data} colors={c} act={act} />;
+  if (page === "routing") return <RoutingPage data={data} colors={c} act={act} read={read ?? (async () => null)} />;
   if (page === "legacy-routing") return <View style={{ gap: 16 }}>{tabs([["agents", "路由组"], ["templates", "模板"]])}{list(arr(tab === "templates" ? d.templates : d.groups), v => say(v.name || v.id || obj(v.group).name || v.kind), v => say(v.why) || `${say(v.routing)} · ${Array.isArray(v.members) ? v.members.length : 0} 个成员`, tab === "templates" ? "暂无模板" : "暂无路由组")}<Text style={note}>当前为路由组和模板列表；路由追踪、规则编辑尚未接入。</Text></View>;
   if (page === "gateway") return <GatewayPage data={data} colors={c} />;
   if (page === 'usage') return <UsagePage data={data} colors={c} selectedTab={usageTab}/>;

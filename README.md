@@ -1,142 +1,65 @@
-# Magpie Manager — Paseo plugin (Windows-layout rebuild)
+# Magpie Manager for Paseo
 
-A Paseo React Native plugin for controlling Magpie on the **Paseo daemon host**.
-Not a standalone website, iframe, or link to the phone's localhost.
+通过 Paseo 桌面／手机管理 **Paseo daemon 所在主机**上的 Magpie。插件使用 React Native，不是独立网站，也不会让手机访问手机自身的 localhost。
 
-## Architecture
+## 架构
 
-Paseo desktop/mobile → plugin screen → authenticated Paseo RPC → server-only
-Magpie HTTP session → local Magpie official API.
+Paseo 客户端 → 插件页面 → Paseo 认证 RPC → 插件服务端 → 本机 Magpie 官方 HTTP API。
 
-UI references: `yetone/magpie` commit `c7ebb6f8`, `internal/gui/assets/index.html`,
-`app.css`, `app.js`; API reference: `internal/gui/api.go`, `providers.go`.
-The UI is a native port, not a claim of pixel-identical rendering.
+Magpie Web 密钥仅由服务端读取，不打入客户端。接口桥接使用路径、方法与查询参数允许列表。
 
-## Rebuild status
+## 功能整理
 
-- Gateway now reads `providers.gateway`, not the unrelated upstream-status feed.
-  Includes live state/address, sharing change confirmation, five API curl examples,
-  enabled-model search/selection, paginated recent calls and on-demand request bodies
-  with authorization-bearing JSON fields masked. Uses Paseo's client clipboard API.
-  LAN key list/create/enable/disable/reveal/rotate/delete are connected; rotate/delete
-  require confirmation. Advanced key budgets, access restrictions, SDK examples and
-  exact Windows visual parity remain outstanding. Real Linux state, model enumeration,
-  recent-call body and key-list reads verified; mutations are fixture-tested only.
+| 模块 | 当前接线 | 验证边界 |
+|---|---|---|
+| Agent | 状态、模型选择、连接／断开、方案保存与使用 | 真实读取；配置写入以模拟测试为主 |
+| 中转供应商 | 新增／编辑／删除确认、五种协议、模型发现与检测、高级参数、自定义图标 | 图标通过认证 RPC 加载；手机 App 图片格式兼容待实机验收 |
+| 网关 | 状态、调用记录、请求详情、示例命令、调用密钥管理 | 真实读取；密钥变更未在真实数据上执行 |
+| 路由 | 路由组与模板、编辑器、自动发现、排除供应商、实时决策、历史详情 | 真实读取；保存与错误保留使用模拟请求验证 |
+| 会话 | 自动读取 Agent、筛选搜索、分组、行内详情与消息、思考折叠、复制、转换、导出、删除确认、Claude 项目迁移 | 真实读取；删除／迁移／转换未对用户会话执行 |
+| 资源库 | 指令方案、技能查找与安装、已有技能导入／删除、MCP、Hooks、子 Agent 编辑与分发 | 浏览器交互与失败保留验证；真实分发待验收 |
+| RTK | 检测、安装／更新、统计、Agent Hook 开关 | 已安装版本曾独立核验；Hook 真实开关待验收 |
+| 用量 | 概览／请求／会话／上下文、筛选、统计、柱状／曲线、内部滚动拆分列表、53 周热力图、请求明细 | 真实只读接口与桌面／手机尺寸浏览器验证 |
+| 外观与导航 | 窄屏抽屉、中文导航、跟随 Paseo／浅色／暗色 | 浏览器验证；手机 App 实机待验收 |
+| 上游／脱敏／插件／设置 | 对应页面与官方读取接口 | 完整操作覆盖见测试报告；不以接口可读替代操作验收 |
 
-- Native Chinese navigation, Agent default page, breadcrumb, bottom settings.
-- Narrow screens use a navigation drawer.
-- Agent rows: actual connection status, model picker, details, connect/disconnect
-  confirmation, profiles save/use.
-- Provider Advanced is inside the existing provider editor fold: concurrency,
-  queue/RPM limits, price rate, context/output/compaction maps, forwarded headers,
-  fallback IDs and behavior flags. The mistakenly added outer per-model editor
-  and temporary version label have been removed, including their save staging.
-  Existing server model preferences are not explicitly reset by this cleanup.
-  Proxy supports global/direct/custom modes. Explicit Linux capability flags gate
-  TLS bypass, error passthrough, image-file and native-compaction switches in both
-  rendering and saves; hidden flags are omitted instead of overwritten. Full
-  Screenshot-driven additions: key/value request headers with JSON toggle, proxy
-  username/password, rate windows (days, cross-midnight hours, up to eight), balance
-  URL/method/path/token and draft balance query, token-length preset chips, catalog
-  in More endpoints. Blank balance token is omitted (never echoes the read status
-  object). Visual ordering, complete helper text, fallback picker, server-version
-  parity and real mutation verification remain pending.
-- Providers: official preset list, custom relay, protocol selection, URL/key,
-  model IDs, edit, test, delete confirmation; failed save retains input.
-  Custom protocol tabs: OpenAI Chat, Responses, Anthropic, Gemini and System One.
-  New providers use non-persistent provider/list; existing providers use
-  provider/models with typed=true and saved-key fallback (refreshes server model
-  cache). Model picker supports filtering, selecting/clearing filtered results,
-  selected counts and bounded scrolling. Upstream dropped picks are removed.
-  Unsaved model-list fetch with selection, protocol detection with optional test
-  model, per-picked-model detection (official 30-model cap), and key show/hide
-  are wired to official endpoints. Detection results render protocol/status,
-  latency, model, endpoint and error rows; per-model results are grouped by model.
-  Batch detection allows the official two-minute backend deadline; full Windows
-  result-grid visual parity remains pending. Built-in icon search/selection uses the official MORE_ICONS list plus presets;
-  HTTPS image URLs can be fetched through the official icon endpoint. Local
-  image-file selection remains pending. Provider editor now
-  follows Windows source row order and label column: Name, Base URL/protocol,
-  key, icon, models, Advanced, More endpoints and trailing cancel/add actions.
-  Advanced exposes custom Headers, extra JSON body, proxy, models-list URL,
-  HTTP/1.1-only, upstream TLS verification bypass and upstream-error passthrough.
-  Inspection and save share these fields; more endpoints exposes all five
-  API URLs. Protocol switching preserves each endpoint rather than clearing it.
-  Full Windows advanced options and exact visual parity remain pending.
-  Provider icons render from official assets or stored pictures via authenticated
-  server RPC as data URIs (no phone-localhost URLs). Custom relays have a name
-  tile fallback, icon preview and explicit site-favicon fetch/reset controls.
-  Save preserves icon/iconFrom; desktop-light/mobile-dark preview tests verify
-  rendering and save payload. Native image-format compatibility remains unverified.
-- Secondary pages now have dedicated session/resource/group/upstream/quota/
-  masking/plugin/settings layouts. Each page explicitly lists its missing
-  interactions. This is not a complete reproduction of Magpie.
-- Library: shared instructions and Agent-specific appended text, current-set
-  editing, Agent distribution selection, MCP stdio/http/sse editor with JSON
-  arguments/env/headers, save/distribution confirmation and server removal.
-  Upstream partial-distribution problems are surfaced; failed saves retain input.
-  Skills: SKILL.md read/edit with optimistic concurrency (`was`), Agent distribution.
-  Hooks: create/edit event, matcher, command, timeout and distribution targets.
-  Subagents: create/edit description, prompt, model and distribution targets;
-  explicit skill/MCP selection with existing advanced fields preserved.
-  Skills/hooks/subagents have resource-removal confirmation, with failed removal
-  keeping the confirmation open. Skill installation supports source probing,
-  candidate selection (already-installed entries disabled), Agent selection and
-  confirmation. Single-skill updates require explicit replacement confirmation
-  for known local edits; removed upstream skills are reported as not updated.
-  Skill editor now lists official text files and caches per-file drafts when
-  switching; modified files save sequentially with their own `was` values.
-  Successful writes are marked saved before retrying remaining files; closing
-  dirty skill drafts requires discard confirmation. Multi-file draft switching
-  and discard/cancel were checked at desktop/mobile light/dark sizes.
-  Instruction set management remains pending.
-  Desktop/mobile light/dark browser tests cover editor opening and failed-write
-  input retention; no real Agent mutations were performed.
-  Browser tests blocked real writes; actual Agent distribution is not yet verified.
-- Sessions: title/working-directory search, Agent filtering, transcript reader,
-  user/assistant/tool messages, in-conversation search, retry, cancellation of
-  stale reads and selectable resume command. Image attachments, export and
-  executing resume remain pending. Browser tests used explicit fixture sessions;
-  the local official sessions list was empty.
-- Routing groups: add/edit/delete and template creation via official endpoints;
-  preserves advanced group properties while editing basic fields.
-- Quotas: balance, allowance windows, used-percentage bars, reset time and
-  per-account refresh. Full request statistics remain pending.
-- Browser regression verified failed routing save retains the input and mobile
-  routing editor has no horizontal overflow; writes were blocked in the preview.
-- Official SVGs for the bird, Claude Code, Codex, Pi, Hermes, library and settings.
-- Appearance: follow Paseo / light / dark, persisted server-side in
-  `~/.config/magpie/paseo-panel.json`, independent of Magpie's own theme.
-- React Native Web preview checked at 1440×1000 and 390×844: navigation, theme
-  switching, drawer and model picker; zero page errors or mobile horizontal
-  overflow. Preview uses a stub Paseo RPC transport and blocks configuration
-  mutations. Actual Paseo desktop/mobile acceptance remains pending.
+界面参考 `yetone/magpie` Windows GUI 源码，属于原生移植，未完成同尺寸逐像素 1:1 验收。
 
-## Setup
+## 安装与配置
 
-Install Magpie on the same host as Paseo and run its authenticated web service
-on loopback (default `http://127.0.0.1:3430`). Configure the plugin server with:
-
-- `MAGPIE_WEB_ORIGIN`: loopback Magpie origin.
-- `MAGPIE_WEB_KEY`: that service's key, only in the daemon environment; or
-  `~/.config/magpie/paseo-web-key` (chmod 600).
-
-The key never goes into the client bundle. The server exposes only explicitly
-allowlisted API paths; errors propagate to the panel.
-
-Install as a Paseo plugin using the repository or its local directory. The
-existing sidebar, full-screen and workspace entries remain Paseo registrations.
-
-## Verification
+1. 在 Paseo daemon 同机安装 Magpie，启动本机认证 Web 服务，默认 `http://127.0.0.1:3430`。
+2. 在 daemon 环境设置 `MAGPIE_WEB_ORIGIN` 和 `MAGPIE_WEB_KEY`；密钥也可保存在 `~/.config/magpie/paseo-web-key`，文件权限 `600`。
+3. 以本仓库或本地目录安装 Paseo 插件。
+4. 重新加载：
 
 ```sh
-npm run typecheck
-node --experimental-strip-types tests/official-api.test.ts
-paseo plugin reload magpie-manager
+XDG_RUNTIME_DIR=/run/user/0 paseo plugin reload magpie-manager
 ```
 
-Tests cover server cookie login, concurrent sign-in, GET/POST, upstream errors
-and rejection of paths outside the allowlist. They do not establish visual
-parity or validate mutations of real Agent configuration.
+`XDG_RUNTIME_DIR` 按 daemon 的运行用户调整。
 
-A local `backup/pre-windows-rebuild-*` Git branch preserves the earlier UI.
+## 测试
+
+Node.js 需支持 `--experimental-strip-types`。
+
+```sh
+npm ci
+npm run typecheck
+npm test
+# 需要同机 Magpie 已启动、Web 密钥已配置；只执行 GET，不输出响应正文。
+npm run test:live
+```
+
+- `tests/*.test.ts`：独立模拟服务／纯数据测试，不需要真实 Magpie。
+- `tests/live-readonly.ts`：17 个真实读取接口的集成冒烟测试，不代表全部字段或写操作验收。
+- 浏览器回归使用本机 `/tmp/magpie-panel-preview` 测试工作区；它不是仓库内可独立安装的测试套件，报告明确记录此限制。
+- 正式结果、失败项、历史脚本失效情况见 [全功能回归报告](docs/TEST-REPORT-2026-11-09.md)。
+
+## 已知未验收项
+
+- 手机 App 真机剪贴板、弹层、图片格式和触摸滚动。
+- 真实会话删除、迁移、转换、Markdown 导出，真实资源分发、密钥轮换与配置改写。
+- 自定义日期、5 秒刷新、CSV 导出和完整 Windows 像素级对齐。
+- 原生消息图片附件与在宿主直接执行继续命令。
+
+历史实现保留在 Git 提交中；测试报告按“模拟交互”“真实读取”“真实写入”“实机验收”区分证据，不混报。

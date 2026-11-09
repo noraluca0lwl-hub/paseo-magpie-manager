@@ -119,6 +119,7 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
       if(list){const models=snapshot.id?result.provider?.models:result.models;if(!Array.isArray(models))throw new Error('模型接口返回缺少模型列表');setListedModels(models);if(result.dropped?.length)setForm(v=>({...v,models:modelIds(v.models).filter(id=>!result.dropped!.includes(id)).join(', ')}));setProviderResult(`获取到 ${models.length} 个模型；勾选后保存。${snapshot.id?'已刷新服务器模型缓存。':''}${result.dropped?.length?` 已移除来源不再提供的 ${result.dropped.length} 个选择。`:''}`);}else {setDetections(result as DetectionOutput);if(each&&modelIds(snapshot.models).length>30)setProviderResult('本次按官方上限检测前 30 个模型。');}
     }catch(e){setError(String(e));}finally{setBusy(false);}
   };
+  const secondaryRead = useCallback(async (path: string) => call(path), [call]);
   const secondaryAct = async (path: string, body: unknown) => {
     if (busy) throw new Error("已有操作正在执行");
     setBusy(true); setError("");
@@ -188,7 +189,7 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
         {endpoints[page] && <>
           {!!sectionError && <Text style={{ color: c.red }}>{sectionError}</Text>}
           {page === "settings" && <View style={{ ...card, ...row }}><Text style={{ ...text, flex: 1 }}>插件外观</Text>{([ ["system", "跟随 Paseo"], ["light", "浅色"], ["dark", "暗色"] ] as const).map(([value, title]) => <View key={value}>{button(`${appearance === value ? "● " : ""}${title}`, () => void saveAppearance(value))}</View>)}</View>}
-          {!sectionError && <SecondaryPage key={page} page={page} data={section} colors={c} usageTab={usageTab} act={secondaryAct} />}
+          {!sectionError && <SecondaryPage key={page} page={page} data={section} colors={c} usageTab={usageTab} act={secondaryAct} read={secondaryRead} />}
         </>}
       </ScrollView>
     </View>
