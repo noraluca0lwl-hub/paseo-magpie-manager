@@ -34,6 +34,7 @@ try {
   assert.equal((await officialRequest('library/servers/save', 'POST', { old: '', server: { name: 'fixture', transport: 'stdio', command: 'fixture', agents: [] } })).method, 'POST');
   await officialRequest('library/skill?name=fixture&file=SKILL.md');
   for (const kind of ['hooks', 'subagents', 'skills']) {
+    assert.equal((await officialRequest(`library/${kind}/remove`, 'POST', {name:'fixture'})).method, 'POST');
     assert.equal((await officialRequest(`library/${kind}/agents`, 'POST', {name:'fixture',agents:[]})).method, 'POST');
     assert.equal((await officialRequest(`library/${kind}/save`, 'POST', {name:'fixture'})).method, 'POST');
   }

@@ -30,8 +30,10 @@ The UI is a native port, not a claim of pixel-identical rendering.
   Skills: SKILL.md read/edit with optimistic concurrency (`was`), Agent distribution.
   Hooks: create/edit event, matcher, command, timeout and distribution targets.
   Subagents: create/edit description, prompt, model and distribution targets;
-  existing advanced fields are preserved. Instruction set management, resource
-  removal, skill installation/update and other skill files remain pending.
+  explicit skill/MCP selection with existing advanced fields preserved.
+  Skills/hooks/subagents have resource-removal confirmation, with failed removal
+  keeping the confirmation open. Instruction set management, skill
+  installation/update and other skill files remain pending.
   Desktop/mobile light/dark browser tests cover editor opening and failed-write
   input retention; no real Agent mutations were performed.
   Browser tests blocked real writes; actual Agent distribution is not yet verified.
