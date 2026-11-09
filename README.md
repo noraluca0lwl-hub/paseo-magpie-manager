@@ -23,6 +23,11 @@ The UI is a native port, not a claim of pixel-identical rendering.
 - Secondary pages now have dedicated session/resource/group/upstream/quota/
   masking/plugin/settings layouts. Each page explicitly lists its missing
   interactions. This is not a complete reproduction of Magpie.
+- Sessions: title/working-directory search, Agent filtering, transcript reader,
+  user/assistant/tool messages, in-conversation search, retry, cancellation of
+  stale reads and selectable resume command. Image attachments, export and
+  executing resume remain pending. Browser tests used explicit fixture sessions;
+  the local official sessions list was empty.
 - Routing groups: add/edit/delete and template creation via official endpoints;
   preserves advanced group properties while editing basic fields.
 - Quotas: balance, allowance windows, used-percentage bars, reset time and

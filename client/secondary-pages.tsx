@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { RoutingPage } from "./routing-page";
+import { SessionsPage } from "./sessions-page";
 
 type RecordValue = Record<string, unknown>;
 const obj = (v: unknown): RecordValue => v && typeof v === "object" && !Array.isArray(v) ? v as RecordValue : {};
@@ -24,10 +25,7 @@ export function SecondaryPage({ page, data, colors: c, act }: {
   const list = (items: RecordValue[], title: (v: RecordValue) => string, sub: (v: RecordValue) => string, none: string) => !items.length ? empty(none, "刷新后显示本机 Magpie 的最新数据") : <View style={card}>{items.map((v, i) => <View key={say(v.id) || String(i)} style={row}><Text style={{ ...label, fontWeight: "600" }}>{title(v)}</Text><Text selectable style={note}>{sub(v)}</Text></View>)}</View>;
   const stats = (items: [string, unknown][]) => <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>{items.map(([name, value]) => <View key={name} style={{ ...card, padding: 20, flexGrow: 1, minWidth: 130 }}><Text style={note}>{name}</Text><Text style={{ ...label, fontSize: 26, marginTop: 8 }}>{say(value) || "0"}</Text></View>)}</View>;
   if (data == null) return <Text style={note}>正在读取官方接口…</Text>;
-  if (page === "sessions") {
-    const rows = arr(d.sessions).filter(v => [v.title, v.name, v.agent, v.dir].map(say).join(" ").toLowerCase().includes(query.toLowerCase()));
-    return <View style={{ gap: 16 }}><TextInput accessibilityLabel="搜索会话" placeholder="搜索会话" placeholderTextColor={c.muted} value={query} onChangeText={setQuery} style={{ ...label, backgroundColor: c.pill, padding: 12, borderRadius: 8 }} />{list(rows, v => say(v.title || v.name || v.id), v => [v.agent, v.dir, v.model].map(say).filter(Boolean).join(" · "), "还没有会话")}<Text style={note}>会话阅读、继续与导出操作尚未接入。</Text></View>;
-  }
+  if (page === "sessions") return <SessionsPage data={data} colors={c} />;
   if (page === "library") return <View style={{ gap: 16 }}>{tabs([["agents", "Agent"], ["servers", "MCP 服务器"], ["skills", "技能"], ["hooks", "Hooks"], ["subagents", "子 Agent"]])}{list(arr(d[tab]), v => say(v.name || v.id), v => [v.instructions, v.skills, v.command, v.description, v.path].map(say).filter(Boolean).join("\n"), "暂无项目")}<Text style={note}>当前为资源列表；编辑、分发与安装操作尚未接入。</Text></View>;
   if (page === "routing") return <RoutingPage data={data} colors={c} act={act} />;
   if (page === "legacy-routing") return <View style={{ gap: 16 }}>{tabs([["agents", "路由组"], ["templates", "模板"]])}{list(arr(tab === "templates" ? d.templates : d.groups), v => say(v.name || v.id || obj(v.group).name || v.kind), v => say(v.why) || `${say(v.routing)} · ${Array.isArray(v.members) ? v.members.length : 0} 个成员`, tab === "templates" ? "暂无模板" : "暂无路由组")}<Text style={note}>当前为路由组和模板列表；路由追踪、规则编辑尚未接入。</Text></View>;
