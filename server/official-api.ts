@@ -30,11 +30,13 @@ function allowed(path: string, method: string) {
   if (base === "gateway/call") return method === "GET" && /^\d+$/.test(params.get("id") ?? "");
   if (base === "sessions/transcript" || base === "sessions/markdown") return method === "GET" && !!params.get("agent") && !!params.get("id");
   if (base === "sessions/export") return method === "POST" && !!params.get("agent") && !!params.get("id");
+  if (base === 'library/rtk') return method === 'GET' || method === 'POST';
+  if (/^library\/rtk\/(install|upgrade|path)$/.test(base)) return method === 'POST';
   if (base === "sessions/manage") return method === "GET";
   if (base === "sessions/search") return method === "GET" && !!params.get("agent") && !!params.get("q");
   if (base === "usage/quotas/refresh") return method === "POST" && !!params.get("provider");
   return method === "GET" ? reads.has(base) :
-    /^(sessions\/(reads|recording|delete|restore|purge|export|terminal|carry|relocate-claude)|caller-keys\/(add-key|rename-key|on-key|off-key|copy-key|rotate-key|remove-key)|settings\/lan|icons\/(favicon|url)|set|agents\/rescan|agents\/(connect|disconnect)\/[a-z0-9_-]+|provider\/(save|delete|test|balance|list|models|detect|on|off)|groups\/(save|delete|switch|template)|profile\/(save|use)|library\/(instructions\/save|servers\/(save|agents|remove)|hooks\/(save|agents|remove)|subagents\/(save|agents|remove)|skills\/(save|agents|remove|probe|install|update))|settings)$/.test(base);
+    /^(sessions\/(reads|recording|delete|restore|purge|export|terminal|carry|relocate-claude)|caller-keys\/(add-key|rename-key|on-key|off-key|copy-key|rotate-key|remove-key)|settings\/lan|icons\/(favicon|url)|set|agents\/rescan|agents\/(connect|disconnect)\/[a-z0-9_-]+|provider\/(save|delete|test|balance|list|models|detect|on|off)|groups\/(save|delete|switch|template)|profile\/(save|use)|library\/(instructions\/save|servers\/(save|agents|remove|import)|hooks\/(save|agents|remove)|subagents\/(save|agents|remove)|skills\/(save|agents|remove|probe|install|update|import|import-all))|settings)$/.test(base);
 }
 export async function officialRequest(path: string, method = "GET", body?: unknown) {
   if (!allowed(path, method)) throw new Error("此接口未开放给插件");
@@ -44,7 +46,7 @@ export async function officialRequest(path: string, method = "GET", body?: unkno
   const request = () => fetch(`${origin}${resource}`, {
     method, headers: { Cookie: cookie, Origin: origin, "Content-Type": "application/json" },
     body: method === "POST" ? JSON.stringify(body ?? {}) : undefined,
-    signal: AbortSignal.timeout(path === 'provider/detect' && Array.isArray((body as {detectModels?:unknown}|undefined)?.detectModels) ? 125000 : 30000), redirect: "error",
+    signal: AbortSignal.timeout(/^library\/rtk\/(install|upgrade)$/.test(path) ? 300000 : path === 'provider/detect' && Array.isArray((body as {detectModels?:unknown}|undefined)?.detectModels) ? 125000 : 30000), redirect: "error",
   });
   let res = await request();
   if (res.status === 401) { await signIn(); res = await request(); }
