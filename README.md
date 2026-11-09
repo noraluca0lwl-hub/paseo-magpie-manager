@@ -32,8 +32,11 @@ The UI is a native port, not a claim of pixel-identical rendering.
   Subagents: create/edit description, prompt, model and distribution targets;
   explicit skill/MCP selection with existing advanced fields preserved.
   Skills/hooks/subagents have resource-removal confirmation, with failed removal
-  keeping the confirmation open. Instruction set management, skill
-  installation/update and other skill files remain pending.
+  keeping the confirmation open. Skill installation supports source probing,
+  candidate selection (already-installed entries disabled), Agent selection and
+  confirmation. Single-skill updates require explicit replacement confirmation
+  for known local edits; removed upstream skills are reported as not updated.
+  Instruction set management and editing other skill files remain pending.
   Desktop/mobile light/dark browser tests cover editor opening and failed-write
   input retention; no real Agent mutations were performed.
   Browser tests blocked real writes; actual Agent distribution is not yet verified.

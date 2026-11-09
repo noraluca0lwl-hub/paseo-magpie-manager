@@ -38,6 +38,7 @@ try {
     assert.equal((await officialRequest(`library/${kind}/agents`, 'POST', {name:'fixture',agents:[]})).method, 'POST');
     assert.equal((await officialRequest(`library/${kind}/save`, 'POST', {name:'fixture'})).method, 'POST');
   }
+  for (const operation of ['probe','install','update']) assert.equal((await officialRequest(`library/skills/${operation}`, 'POST', {source:'fixture',name:'fixture'})).method, 'POST');
   const before = calls;
   for (const path of ['library/skill', 'library/skill?name=fixture&url=http://example.com', 'library/skills/install', '../settings', 'state?k=leak', 'quit', 'http://example.com', 'state%3Fk=leak', 'sessions/transcript?agent=x&id=y&path=/etc/passwd', 'usage/quotas/refresh?provider=x&url=http://example.com']) await assert.rejects(officialRequest(path));
   assert.equal(calls, before);

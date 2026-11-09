@@ -89,7 +89,9 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
     if (busy) throw new Error("已有操作正在执行");
     setBusy(true); setError("");
     try {
-      const result = await call(path, body) as { result?: { problems?: unknown[] }; problems?: unknown[] } | null;
+      const result = await call(path, body) as { result?: { problems?: unknown[]; gone?: string[] }; problems?: unknown[]; gone?: string[] } | null;
+      const gone = result?.result?.gone ?? result?.gone;
+      if (gone?.length) throw new Error(`来源已移除这些技能，未更新：${gone.join('、')}`);
       const problems = result?.result?.problems ?? result?.problems;
       if (problems?.length) throw new Error(`配置已保存但分发有异常，请检查后重试：${JSON.stringify(problems)}`);
       await refresh();
