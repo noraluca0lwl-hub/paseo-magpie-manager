@@ -35,7 +35,12 @@ The UI is a native port, not a claim of pixel-identical rendering.
   Proxy supports global/direct/custom modes. Explicit Linux capability flags gate
   TLS bypass, error passthrough, image-file and native-compaction switches in both
   rendering and saves; hidden flags are omitted instead of overwritten. Full
-  Windows parity and real mutation verification remain pending.
+  Screenshot-driven additions: key/value request headers with JSON toggle, proxy
+  username/password, rate windows (days, cross-midnight hours, up to eight), balance
+  URL/method/path/token and draft balance query, token-length preset chips, catalog
+  in More endpoints. Blank balance token is omitted (never echoes the read status
+  object). Visual ordering, complete helper text, fallback picker, server-version
+  parity and real mutation verification remain pending.
 - Providers: official preset list, custom relay, protocol selection, URL/key,
   model IDs, edit, test, delete confirmation; failed save retains input.
   Custom protocol tabs: OpenAI Chat, Responses, Anthropic, Gemini and System One.
