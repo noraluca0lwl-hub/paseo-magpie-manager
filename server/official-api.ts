@@ -36,7 +36,7 @@ function allowed(path: string, method: string) {
   if (base === "sessions/search") return method === "GET" && !!params.get("agent") && !!params.get("q");
   if (base === "usage/quotas/refresh") return method === "POST" && !!params.get("provider");
   return method === "GET" ? reads.has(base) :
-    /^(sessions\/(reads|recording|delete|restore|purge|export|terminal|carry|relocate-claude)|caller-keys\/(add-key|rename-key|on-key|off-key|copy-key|rotate-key|remove-key)|settings\/lan|icons\/(favicon|url)|set|agents\/rescan|agents\/(connect|disconnect)\/[a-z0-9_-]+|provider\/(save|delete|test|balance|list|models|detect|on|off)|groups\/(save|delete|switch|template)|profile\/(save|use)|library\/(instructions\/save|servers\/(save|agents|remove|import)|hooks\/(save|agents|remove)|subagents\/(save|agents|remove)|skills\/(save|agents|remove|probe|install|update|import|import-all))|settings)$/.test(base);
+    /^(sessions\/(reads|recording|delete|restore|purge|export|terminal|carry|relocate-claude)|caller-keys\/(add-key|rename-key|on-key|off-key|copy-key|rotate-key|remove-key)|settings\/lan|icons\/(favicon|url)|set|agents\/rescan|agents\/(connect|disconnect)\/[a-z0-9_-]+|provider\/(save|delete|test|balance|list|models|detect|on|off)|groups\/(save|delete|switch|template)|profile\/(save|use)|library\/(instructions\/save|servers\/(save|agents|remove|import)|hooks\/(save|agents|remove)|subagents\/(save|agents|remove)|skills\/(save|agents|remove|probe|install|update|import|import-all|remove-found))|settings)$/.test(base);
 }
 export async function officialRequest(path: string, method = "GET", body?: unknown) {
   if (!allowed(path, method)) throw new Error("此接口未开放给插件");
