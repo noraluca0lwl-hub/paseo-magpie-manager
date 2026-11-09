@@ -27,6 +27,13 @@ The UI is a native port, not a claim of pixel-identical rendering.
 - Narrow screens use a navigation drawer.
 - Agent rows: actual connection status, model picker, details, connect/disconnect
   confirmation, profiles save/use.
+- Per-model advanced editor: display name, equivalent-model mapping, local ID
+  (when advertised), context/max-output overrides, reasoning levels/reasonless,
+  image support, protocol, model headers and basic token prices. Stages typed
+  `modelPrefs` plus merged `contexts`/`outputs` in provider/save; no automatic
+  write on field change. Failed save retains drafts. Long-context price tiers,
+  restore-inherited image/price controls and full Windows layout remain pending.
+  Desktop/mobile fixture tests assert actual save payloads; real writes pending.
 - Providers: official preset list, custom relay, protocol selection, URL/key,
   model IDs, edit, test, delete confirmation; failed save retains input.
   Custom protocol tabs: OpenAI Chat, Responses, Anthropic, Gemini and System One.
