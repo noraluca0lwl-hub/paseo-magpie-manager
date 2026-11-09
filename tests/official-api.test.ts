@@ -32,8 +32,13 @@ try {
   await officialRequest('sessions/transcript?agent=fixture&id=abc%3Adef');
   assert.equal((await officialRequest('library/instructions/save', 'POST', { texts: { default: 'fixture' }, agents: [] })).method, 'POST');
   assert.equal((await officialRequest('library/servers/save', 'POST', { old: '', server: { name: 'fixture', transport: 'stdio', command: 'fixture', agents: [] } })).method, 'POST');
+  await officialRequest('library/skill?name=fixture&file=SKILL.md');
+  for (const kind of ['hooks', 'subagents', 'skills']) {
+    assert.equal((await officialRequest(`library/${kind}/agents`, 'POST', {name:'fixture',agents:[]})).method, 'POST');
+    assert.equal((await officialRequest(`library/${kind}/save`, 'POST', {name:'fixture'})).method, 'POST');
+  }
   const before = calls;
-  for (const path of ['../settings', 'state?k=leak', 'quit', 'http://example.com', 'state%3Fk=leak', 'sessions/transcript?agent=x&id=y&path=/etc/passwd', 'usage/quotas/refresh?provider=x&url=http://example.com']) await assert.rejects(officialRequest(path));
+  for (const path of ['library/skill', 'library/skill?name=fixture&url=http://example.com', 'library/skills/install', '../settings', 'state?k=leak', 'quit', 'http://example.com', 'state%3Fk=leak', 'sessions/transcript?agent=x&id=y&path=/etc/passwd', 'usage/quotas/refresh?provider=x&url=http://example.com']) await assert.rejects(officialRequest(path));
   assert.equal(calls, before);
   console.log('PASS: single-flight login, cookie, GET/POST, error propagation, route allowlist');
 } finally { server.closeAllConnections(); server.close(); }

@@ -27,7 +27,13 @@ The UI is a native port, not a claim of pixel-identical rendering.
   editing, Agent distribution selection, MCP stdio/http/sse editor with JSON
   arguments/env/headers, save/distribution confirmation and server removal.
   Upstream partial-distribution problems are surfaced; failed saves retain input.
-  Skills/hooks/subagent editing and instruction set management remain pending.
+  Skills: SKILL.md read/edit with optimistic concurrency (`was`), Agent distribution.
+  Hooks: create/edit event, matcher, command, timeout and distribution targets.
+  Subagents: create/edit description, prompt, model and distribution targets;
+  existing advanced fields are preserved. Instruction set management, resource
+  removal, skill installation/update and other skill files remain pending.
+  Desktop/mobile light/dark browser tests cover editor opening and failed-write
+  input retention; no real Agent mutations were performed.
   Browser tests blocked real writes; actual Agent distribution is not yet verified.
 - Sessions: title/working-directory search, Agent filtering, transcript reader,
   user/assistant/tool messages, in-conversation search, retry, cancellation of

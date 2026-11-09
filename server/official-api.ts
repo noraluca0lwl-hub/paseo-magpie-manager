@@ -17,17 +17,19 @@ async function signIn() {
 }
 const reads = new Set(["state", "providers", "settings", "sessions", "library", "usage", "usage/quotas", "groups", "upstream", "masking/summary", "plugins"]);
 function allowed(path: string, method: string) {
+  if (method !== "GET" && method !== "POST") return false;
   if (/[#\\\\]|\.\./.test(path)) return false;
   const [base, query = ""] = path.split("?");
   if (path.split("?").length > 2) return false;
   const params = new URLSearchParams(query);
-  const queryKeys = base === "sessions/transcript" ? ["agent", "id"] : base === "usage/quotas/refresh" ? ["provider", "user"] : [];
+  const queryKeys = base === "library/skill" ? ["name", "file"] : base === "sessions/transcript" ? ["agent", "id"] : base === "usage/quotas/refresh" ? ["provider", "user"] : [];
   if ([...params.keys()].some(key => !queryKeys.includes(key))) return false;
   if (query && !queryKeys.length) return false;
+  if (base === "library/skill") return method === "GET" && !!params.get("name");
   if (base === "sessions/transcript") return method === "GET" && !!params.get("agent") && !!params.get("id");
   if (base === "usage/quotas/refresh") return method === "POST" && !!params.get("provider");
   return method === "GET" ? reads.has(base) :
-    /^(set|agents\/rescan|agents\/(connect|disconnect)\/[a-z0-9_-]+|provider\/(save|delete|test)|groups\/(save|delete|switch|template)|profile\/(save|use)|library\/(instructions\/save|servers\/(save|agents|remove))|settings)$/.test(base);
+    /^(set|agents\/rescan|agents\/(connect|disconnect)\/[a-z0-9_-]+|provider\/(save|delete|test)|groups\/(save|delete|switch|template)|profile\/(save|use)|library\/(instructions\/save|servers\/(save|agents|remove)|hooks\/(save|agents|remove)|subagents\/(save|agents|remove)|skills\/(save|agents))|settings)$/.test(base);
 }
 export async function officialRequest(path: string, method = "GET", body?: unknown) {
   if (!allowed(path, method)) throw new Error("此接口未开放给插件");
