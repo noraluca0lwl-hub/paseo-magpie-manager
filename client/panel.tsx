@@ -88,7 +88,12 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
   const secondaryAct = async (path: string, body: unknown) => {
     if (busy) throw new Error("已有操作正在执行");
     setBusy(true); setError("");
-    try { await call(path, body); await refresh(); }
+    try {
+      const result = await call(path, body) as { result?: { problems?: unknown[] }; problems?: unknown[] } | null;
+      const problems = result?.result?.problems ?? result?.problems;
+      if (problems?.length) throw new Error(`配置已保存但分发有异常，请检查后重试：${JSON.stringify(problems)}`);
+      await refresh();
+    }
     catch (e) { setError(String(e)); throw e; }
     finally { setBusy(false); }
   };

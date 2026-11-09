@@ -23,6 +23,12 @@ The UI is a native port, not a claim of pixel-identical rendering.
 - Secondary pages now have dedicated session/resource/group/upstream/quota/
   masking/plugin/settings layouts. Each page explicitly lists its missing
   interactions. This is not a complete reproduction of Magpie.
+- Library: shared instructions and Agent-specific appended text, current-set
+  editing, Agent distribution selection, MCP stdio/http/sse editor with JSON
+  arguments/env/headers, save/distribution confirmation and server removal.
+  Upstream partial-distribution problems are surfaced; failed saves retain input.
+  Skills/hooks/subagent editing and instruction set management remain pending.
+  Browser tests blocked real writes; actual Agent distribution is not yet verified.
 - Sessions: title/working-directory search, Agent filtering, transcript reader,
   user/assistant/tool messages, in-conversation search, retry, cancellation of
   stale reads and selectable resume command. Image attachments, export and
