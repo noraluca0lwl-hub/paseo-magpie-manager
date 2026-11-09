@@ -150,7 +150,7 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
     {!compact && <View style={{ width: 212 }}>{sidebar}</View>}
     <View style={{ flex: 1, minWidth: 0 }}>
       <View style={{ ...row, minHeight: 52, paddingVertical: 10 }}>
-        {compact && button("☰", () => setDrawer(true))}<Text style={{ ...muted, flex: 1 }}>{group}  /  <Text style={{ color: c.text, fontWeight: "600" }}>{label}</Text></Text>
+        {compact && button("☰", () => setDrawer(true))}<Text style={{ ...muted, flex: 1 }}>{group}  /  <Text style={{ color: c.text, fontWeight: "600" }}>{label}</Text><Text style={{fontSize:10}}> · 模型高级 v2</Text></Text>
         {loading ? <ActivityIndicator color={c.purple} /> : button("刷新", () => void refresh())}
       </View>
       <ScrollView contentContainerStyle={{ padding: compact ? 14 : 32, paddingTop: 16, paddingBottom: 48, gap: 18 }}>
