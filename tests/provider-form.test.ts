@@ -1,8 +1,13 @@
 import {strict as assert} from 'node:assert';
 const modulePath='../client/provider-form.ts';
-const {modelIds,savedModelIds,formHeaders}=await import(modulePath);
+const {modelIds,savedModelIds,formHeaders,preservedProviderSettings}=await import(modulePath);
 assert.deepEqual(modelIds('a，b, a\nc'),['a','b','c']);
 assert.deepEqual(savedModelIds([{id:'enabled',on:true},{id:'disabled',on:false},'legacy']),['enabled','legacy']);
 assert.deepEqual(formHeaders('{"X-Test":"yes"}'),{'X-Test':'yes'});
 for(const value of ['[]','null','{"X":4}'])assert.throws(()=>formHeaders(value));
-console.log('PASS provider form: selected models only, separators, headers');
+const dto={balanceToken:{takes:true,set:true},accessKey:{set:true},models:[{id:'a',on:true}],accounts:[{}],key:{set:true},routing:'ordered',balanceURL:'https://example.com/balance',fallback:['a'],contexts:{a:1000},unlisted:true};
+const kept=preservedProviderSettings(dto);
+assert.deepEqual(kept,{routing:'ordered',balanceURL:'https://example.com/balance',fallback:['a'],contexts:{a:1000},unlisted:true});
+for(const key of ['balanceToken','accessKey','models','accounts','key'])assert.equal(key in kept,false);
+assert.deepEqual(preservedProviderSettings({contexts:{a:'bad'},fallback:[{}],routing:{}}),{});
+console.log('PASS provider form: selected models, separators, headers, read-DTO isolation and settings preservation');

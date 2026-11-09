@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Modal, Pressable, ScrollView, Switch, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { officialApi, panelPreferences } from "../shared/contracts";
 import { officialIcons } from "./official-icons";
-import { modelIds, savedModelIds, formHeaders } from './provider-form';
+import { modelIds, savedModelIds, formHeaders, preservedProviderSettings } from './provider-form';
 import { ProviderAdvanced,emptyAdvanced,advancedFrom,advancedPayload } from './provider-advanced';
 import { providerIcons } from './provider-icons';
 import { ProviderIcon } from './provider-icon';
@@ -200,7 +200,7 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
         try { const u = new URL(form.url); if (!["https:", "http:"].includes(u.protocol)) throw new Error(); } catch { setError("请填写有效的 HTTP 或 HTTPS Base URL"); return; }
         let headers:Record<string,string>;try{const value=JSON.parse(headerDraft);if(!value||Array.isArray(value)||typeof value!=='object'||Object.values(value).some(v=>typeof v!=='string'))throw new Error();headers=value;advancedPayload(advancedDraft);for(const address of Object.values(endpointDraft)){if(address.trim()&&!['http:','https:'].includes(new URL(address).protocol))throw new Error();}}catch(e){setError(`配置校验失败：${String(e)}`);return;}
         const existing = vendors.providers.find(p => p.id === form.id);
-        void act("provider/save", { ...(existing ?? {}), chat:'',responses:'',anthropic:'',gemini:'',decide:'',...endpointDraft,headers,...advancedPayload(advancedDraft), id: form.id || form.name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-") || "relay", name: form.name.trim(), icon:form.icon, iconFrom:form.iconFrom, key: form.key.trim(), preset: form.preset, [form.protocol]: form.url.trim(), new: !form.id, models:modelIds(form.models),...(form.id?{noModels:!modelIds(form.models).length}:{}) }, () => { setEditing(false); setForm(freshForm); });
+        void act("provider/save", { ...preservedProviderSettings(existing as unknown as Record<string,unknown>),baseAPI:form.protocol, chat:'',responses:'',anthropic:'',gemini:'',decide:'',...endpointDraft,headers,...advancedPayload(advancedDraft), id: form.id || form.name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-") || "relay", name: form.name.trim(), icon:form.icon, iconFrom:form.iconFrom, key: form.key.trim(), preset: form.preset, [form.protocol]: form.url.trim(), new: !form.id, models:modelIds(form.models),...(form.id?{noModels:!modelIds(form.models).length}:{}) }, () => { setEditing(false); setForm(freshForm); });
       })}</View>
       {!!error && <Text selectable style={{ color: c.red }}>{error}</Text>}
     </>)}
