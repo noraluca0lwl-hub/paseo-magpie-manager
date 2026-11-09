@@ -27,13 +27,12 @@ The UI is a native port, not a claim of pixel-identical rendering.
 - Narrow screens use a navigation drawer.
 - Agent rows: actual connection status, model picker, details, connect/disconnect
   confirmation, profiles save/use.
-- Per-model advanced editor: display name, equivalent-model mapping, local ID
-  (when advertised), context/max-output overrides, reasoning levels/reasonless,
-  image support, protocol, model headers and basic token prices. Stages typed
-  `modelPrefs` plus merged `contexts`/`outputs` in provider/save; no automatic
-  write on field change. Failed save retains drafts. Long-context price tiers,
-  restore-inherited image/price controls and full Windows layout remain pending.
-  Desktop/mobile fixture tests assert actual save payloads; real writes pending.
+- Provider Advanced is inside the existing provider editor fold: concurrency,
+  queue/RPM limits, price rate, context/output/compaction maps, forwarded headers,
+  fallback IDs and behavior flags. The mistakenly added outer per-model editor
+  and temporary version label have been removed, including their save staging.
+  Existing server model preferences are not explicitly reset by this cleanup.
+  Native capability gating and full Windows parity remain pending.
 - Providers: official preset list, custom relay, protocol selection, URL/key,
   model IDs, edit, test, delete confirmation; failed save retains input.
   Custom protocol tabs: OpenAI Chat, Responses, Anthropic, Gemini and System One.
