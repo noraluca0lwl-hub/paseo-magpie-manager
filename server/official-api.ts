@@ -25,22 +25,32 @@ function allowed(path: string, method: string) {
   const queryKeys = base === "library/skill" ? ["name", "file"] : base === "sessions/transcript" ? ["agent", "id"] : base === "usage/quotas/refresh" ? ["provider", "user"] : [];
   if ([...params.keys()].some(key => !queryKeys.includes(key))) return false;
   if (query && !queryKeys.length) return false;
+  if (method === 'GET' && /^icons\/[a-zA-Z0-9_.-]+$/.test(base)) return true;
   if (base === "library/skill") return method === "GET" && !!params.get("name");
   if (base === "sessions/transcript") return method === "GET" && !!params.get("agent") && !!params.get("id");
   if (base === "usage/quotas/refresh") return method === "POST" && !!params.get("provider");
   return method === "GET" ? reads.has(base) :
-    /^(set|agents\/rescan|agents\/(connect|disconnect)\/[a-z0-9_-]+|provider\/(save|delete|test)|groups\/(save|delete|switch|template)|profile\/(save|use)|library\/(instructions\/save|servers\/(save|agents|remove)|hooks\/(save|agents|remove)|subagents\/(save|agents|remove)|skills\/(save|agents|remove|probe|install|update))|settings)$/.test(base);
+    /^(icons\/(favicon|url)|set|agents\/rescan|agents\/(connect|disconnect)\/[a-z0-9_-]+|provider\/(save|delete|test)|groups\/(save|delete|switch|template)|profile\/(save|use)|library\/(instructions\/save|servers\/(save|agents|remove)|hooks\/(save|agents|remove)|subagents\/(save|agents|remove)|skills\/(save|agents|remove|probe|install|update))|settings)$/.test(base);
 }
 export async function officialRequest(path: string, method = "GET", body?: unknown) {
   if (!allowed(path, method)) throw new Error("此接口未开放给插件");
   if (!cookie) await signIn();
-  const request = () => fetch(`${origin}/api/${path}`, {
+  const asset = path.match(/^icons\/(builtin-[a-zA-Z0-9_-]+\.(?:svg|png))$/);
+  const resource = asset ? `/icons/${asset[1].slice(8)}` : `/api/${path}`;
+  const request = () => fetch(`${origin}${resource}`, {
     method, headers: { Cookie: cookie, Origin: origin, "Content-Type": "application/json" },
     body: method === "POST" ? JSON.stringify(body ?? {}) : undefined,
     signal: AbortSignal.timeout(30000), redirect: "error",
   });
   let res = await request();
   if (res.status === 401) { await signIn(); res = await request(); }
+  if (method === 'GET' && path.startsWith('icons/') && res.ok) {
+    const mime = (res.headers.get('content-type') ?? '').split(';')[0];
+    if (!['image/svg+xml','image/png','image/jpeg','image/webp','image/x-icon','image/vnd.microsoft.icon'].includes(mime)) throw new Error('图标格式未识别');
+    const bytes = Buffer.from(await res.arrayBuffer());
+    if (bytes.length > 1024 * 1024) throw new Error('图标超过 1 MB');
+    return { uri: `data:${mime};base64,${bytes.toString('base64')}` };
+  }
   const text = await res.text();
   if (!res.ok) throw new Error(`Magpie ${path} (${res.status}): ${text.slice(0, 500)}`);
   try { return JSON.parse(text); } catch { throw new Error(`Magpie ${path} 返回的不是 JSON`); }

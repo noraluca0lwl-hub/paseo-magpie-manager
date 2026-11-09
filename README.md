@@ -20,6 +20,11 @@ The UI is a native port, not a claim of pixel-identical rendering.
   confirmation, profiles save/use.
 - Providers: official preset list, custom relay, protocol selection, URL/key,
   model IDs, edit, test, delete confirmation; failed save retains input.
+  Provider icons render from official assets or stored pictures via authenticated
+  server RPC as data URIs (no phone-localhost URLs). Custom relays have a name
+  tile fallback, icon preview and explicit site-favicon fetch/reset controls.
+  Save preserves icon/iconFrom; desktop-light/mobile-dark preview tests verify
+  rendering and save payload. Native image-format compatibility remains unverified.
 - Secondary pages now have dedicated session/resource/group/upstream/quota/
   masking/plugin/settings layouts. Each page explicitly lists its missing
   interactions. This is not a complete reproduction of Magpie.

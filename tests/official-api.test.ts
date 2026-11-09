@@ -13,6 +13,7 @@ const server = createServer((req, res) => {
   assert.equal(req.headers.cookie, 'magpie=test');
   calls++;
   if (url.pathname === '/api/settings') { res.writeHead(500); res.end('fixture error'); return; }
+  if (url.pathname === '/api/icons/fixture.svg' || url.pathname === '/icons/openai.svg') { res.setHeader('Content-Type','image/svg+xml');res.end('<svg xmlns="http://www.w3.org/2000/svg"/>');return; }
   res.setHeader('Content-Type', 'application/json');
   res.end(JSON.stringify({ agents: [], method: req.method }));
 });
@@ -39,6 +40,9 @@ try {
     assert.equal((await officialRequest(`library/${kind}/save`, 'POST', {name:'fixture'})).method, 'POST');
   }
   for (const operation of ['probe','install','update']) assert.equal((await officialRequest(`library/skills/${operation}`, 'POST', {source:'fixture',name:'fixture'})).method, 'POST');
+  assert.equal((await officialRequest('icons/favicon','POST',{url:'https://example.com',name:'fixture'})).method,'POST');
+  assert.equal((await officialRequest('icons/fixture.svg')).uri.startsWith('data:image/svg+xml;base64,'),true);
+  assert.equal((await officialRequest('icons/builtin-openai.svg')).uri.startsWith('data:image/svg+xml;base64,'),true);
   const before = calls;
   for (const path of ['library/skill', 'library/skill?name=fixture&url=http://example.com', 'library/skills/install', '../settings', 'state?k=leak', 'quit', 'http://example.com', 'state%3Fk=leak', 'sessions/transcript?agent=x&id=y&path=/etc/passwd', 'usage/quotas/refresh?provider=x&url=http://example.com']) await assert.rejects(officialRequest(path));
   assert.equal(calls, before);
