@@ -40,7 +40,7 @@ export async function officialRequest(path: string, method = "GET", body?: unkno
   const request = () => fetch(`${origin}${resource}`, {
     method, headers: { Cookie: cookie, Origin: origin, "Content-Type": "application/json" },
     body: method === "POST" ? JSON.stringify(body ?? {}) : undefined,
-    signal: AbortSignal.timeout(30000), redirect: "error",
+    signal: AbortSignal.timeout(path === 'provider/detect' && Array.isArray((body as {detectModels?:unknown}|undefined)?.detectModels) ? 125000 : 30000), redirect: "error",
   });
   let res = await request();
   if (res.status === 401) { await signIn(); res = await request(); }

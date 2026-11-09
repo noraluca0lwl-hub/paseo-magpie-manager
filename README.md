@@ -22,9 +22,11 @@ The UI is a native port, not a claim of pixel-identical rendering.
   model IDs, edit, test, delete confirmation; failed save retains input.
   Custom protocol tabs: OpenAI Chat, Responses, Anthropic, Gemini and System One.
   Unsaved model-list fetch with selection, protocol detection with optional test
-  model, and key show/hide are wired to official endpoints. Detection results
-  currently render as JSON rather than the Windows result grid. Advanced/more
-  image picker and built-in icon picker remain pending. Provider editor now
+  model, per-picked-model detection (official 30-model cap), and key show/hide
+  are wired to official endpoints. Detection results render protocol/status,
+  latency, model, endpoint and error rows; per-model results are grouped by model.
+  Batch detection allows the official two-minute backend deadline; full Windows
+  result-grid visual parity remains pending. The image picker and built-in icon picker remain pending. Provider editor now
   follows Windows source row order and label column: Name, Base URL/protocol,
   key, icon, models, Advanced, More endpoints and trailing cancel/add actions.
   Advanced currently exposes custom Headers; more endpoints exposes all five
