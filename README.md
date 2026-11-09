@@ -24,7 +24,12 @@ The UI is a native port, not a claim of pixel-identical rendering.
   Unsaved model-list fetch with selection, protocol detection with optional test
   model, and key show/hide are wired to official endpoints. Detection results
   currently render as JSON rather than the Windows result grid. Advanced/more
-  endpoint fields, image picker and built-in icon picker remain pending.
+  image picker and built-in icon picker remain pending. Provider editor now
+  follows Windows source row order and label column: Name, Base URL/protocol,
+  key, icon, models, Advanced, More endpoints and trailing cancel/add actions.
+  Advanced currently exposes custom Headers; more endpoints exposes all five
+  API URLs. Protocol switching preserves each endpoint rather than clearing it.
+  Full Windows advanced options and exact visual parity remain pending.
   Provider icons render from official assets or stored pictures via authenticated
   server RPC as data URIs (no phone-localhost URLs). Custom relays have a name
   tile fallback, icon preview and explicit site-favicon fetch/reset controls.
