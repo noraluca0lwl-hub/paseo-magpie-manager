@@ -5,18 +5,20 @@ import { type PluginAgentPanelProps, useRpc } from "@getpaseo/plugin/client";
 import { Icon } from "@getpaseo/plugin/client/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Modal, Pressable, ScrollView, Switch, Text, TextInput, View, useWindowDimensions } from "react-native";
-import { officialApi } from "../shared/contracts";
+import { officialApi, panelPreferences } from "../shared/contracts";
+import { officialIcons } from "./official-icons";
+import { SecondaryPage } from "./secondary-pages";
 import { I_agents, I_sessions, I_providers, I_routing, I_gateway, I_usage, I_masking, I_plugins } from "./nav-icons";
 
 type Option = { value: string; label?: string; note?: string; group?: string };
 type Field = { key: string; label: string; value: string; options: Option[] };
-type Agent = { id: string; name: string; wired?: boolean; path: string; fields: Field[]; models?: number };
+type Agent = { id: string; name: string; icon?: string; wired?: boolean; path: string; fields: Field[]; models?: number };
 type Provider = { id: string; name: string; chat?: string; anthropic?: string; responses?: string; models?: unknown[]; key?: string; preset?: string };
 type State = { agents: Agent[]; profiles: { name: string }[]; settings?: Record<string, unknown> };
 type Providers = { providers: Provider[]; presets: (Provider & { kind?: string })[] };
 type Page = "agents" | "sessions" | "library" | "providers" | "routing" | "gateway" | "usage" | "masking" | "plugins" | "settings";
 const nav: { group: string; items: { id: Page; label: string; icon: { svg: string } | string }[] }[] = [
-  { group: "使用", items: [{ id: "agents", label: "Agent", icon: I_agents }, { id: "sessions", label: "会话", icon: I_sessions }, { id: "library", label: "资源库", icon: "BookOpen" }] },
+  { group: "使用", items: [{ id: "agents", label: "Agent", icon: I_agents }, { id: "sessions", label: "会话", icon: I_sessions }, { id: "library", label: "资源库", icon: officialIcons.library }] },
   { group: "模型", items: [{ id: "providers", label: "供应商", icon: I_providers }, { id: "routing", label: "路由", icon: I_routing }, { id: "gateway", label: "网关", icon: I_gateway }] },
   { group: "观测", items: [{ id: "usage", label: "用量", icon: I_usage }, { id: "masking", label: "脱敏", icon: I_masking }] },
   { group: "扩展", items: [{ id: "plugins", label: "插件", icon: I_plugins }] },
@@ -30,8 +32,16 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
   const compact = width < 700;
   const [page, setPage] = useState<Page>("agents");
   const [drawer, setDrawer] = useState(false);
-  const [appearance, setAppearance] = useState<"light" | "dark">("light");
-  const dark = appearance === "dark";
+  const preferences = useRpc(panelPreferences);
+  const [appearance, setAppearance] = useState<"system" | "light" | "dark">("system");
+  useEffect(() => { void preferences({}).then(p => setAppearance(p.theme)).catch(e => setError(String(e))); }, [preferences]);
+  const saveAppearance = async (value: "system" | "light" | "dark") => {
+    try { const p = await preferences({ theme: value }); setAppearance(p.theme); }
+    catch (e) { setError(String(e)); }
+  };
+  const surface = theme.colors.surface0.replace("#", "");
+  const themeDark = surface.length === 6 && (parseInt(surface.slice(0, 2), 16) * .299 + parseInt(surface.slice(2, 4), 16) * .587 + parseInt(surface.slice(4, 6), 16) * .114) < 128;
+  const dark = appearance === "dark" || appearance === "system" && themeDark;
   const c = { bg: dark ? "#1b1c20" : "#f2f2f5", card: dark ? "#25262c" : "#ffffff", text: dark ? "#ededf1" : "#202124", muted: dark ? "#9c9ca6" : "#83858e", line: dark ? "#34353b" : "#e4e5e9", pill: dark ? "#303139" : "#f0f0f3", purple: dark ? "#a5a0ff" : "#7662ff", green: "#16a56b", red: "#d54949" };
   const [state, setState] = useState<State | null>(null);
   const [vendors, setVendors] = useState<Providers>({ providers: [], presets: [] });
@@ -86,11 +96,11 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
   const input = { color: c.text, backgroundColor: c.pill, borderRadius: 7, padding: 11, fontSize: 14, minHeight: 42 };
   const button = (title: string, action: () => void, danger = false) => <Pressable accessibilityRole="button" disabled={busy} onPress={action} style={{ paddingVertical: 9, paddingHorizontal: 12, borderRadius: 7, backgroundColor: c.pill, opacity: busy ? .5 : 1 }}><Text style={{ color: danger ? c.red : c.text, fontSize: 13 }}>{title}</Text></Pressable>;
   const sidebar = <View style={{ flex: 1, backgroundColor: c.bg, borderRightWidth: 1, borderRightColor: c.line }}>
-    <View style={{ height: 46, paddingHorizontal: 18, flexDirection: "row", alignItems: "center", gap: 8 }}><Icon icon="PanelLeft" size={16} color={c.muted} /><Text style={text}>magpie</Text>{compact && button("关闭", () => setDrawer(false))}</View>
+    <View style={{ height: 46, paddingHorizontal: 18, flexDirection: "row", alignItems: "center", gap: 8 }}><Icon icon={officialIcons.magpie} size={18} color={c.text} /><Text style={text}>magpie</Text>{compact && button("关闭", () => setDrawer(false))}</View>
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 10, paddingBottom: 20 }}>
       {nav.map(g => <View key={g.group}><Text style={{ ...muted, paddingHorizontal: 8, paddingTop: 17, paddingBottom: 6, fontSize: 12 }}>{g.group}</Text>{g.items.map(i => <Pressable key={i.id} onPress={() => go(i.id)} accessibilityRole="button" accessibilityState={{ selected: page === i.id }} style={{ height: 38, borderRadius: 7, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: page === i.id ? c.card : "transparent", borderWidth: page === i.id ? 1 : 0, borderColor: c.line }}><Icon icon={i.icon} size={16} color={page === i.id ? c.text : c.muted} /><Text style={text}>{i.label}</Text></Pressable>)}</View>)}
     </ScrollView>
-    <Pressable onPress={() => go("settings")} style={{ ...row, borderTopWidth: 1, borderTopColor: c.line }}><Icon icon="Settings" size={16} color={c.muted} /><Text style={text}>设置</Text></Pressable>
+    <Pressable onPress={() => go("settings")} style={{ ...row, borderTopWidth: 1, borderTopColor: c.line }}><Icon icon={officialIcons.settings} size={16} color={c.muted} /><Text style={text}>设置</Text></Pressable>
   </View>;
   const modal = (visible: boolean, close: () => void, title: string, children: React.ReactNode) => <Modal visible={visible} transparent animationType="fade" onRequestClose={close}><View style={{ flex: 1, backgroundColor: "rgba(0,0,0,.35)", justifyContent: "center", padding: compact ? 12 : 40 }}><View style={{ ...card, width: "100%", maxWidth: 640, maxHeight: "90%", alignSelf: "center" }}><View style={row}><Text style={{ ...text, fontWeight: "600", flex: 1 }}>{title}</Text>{button("关闭", close)}</View><ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>{children}</ScrollView></View></View></Modal>;
   const shown = expanded ? state?.agents ?? [] : (state?.agents ?? []).slice(0, 2);
@@ -107,7 +117,7 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
           <Text style={{ ...muted, lineHeight: 22 }}>打开「接入」后，magpie 中配置的模型会作为 magpie 供应商出现在 agent 的模型列表里；也可在此直接选模型。</Text>
           <View style={card}>
             {shown.map((a, index) => { const field = a.fields.find(f => f.key === "model") ?? a.fields.find(f => ["large", "executor", "planner"].includes(f.label)); return <View key={a.id} style={{ ...row, minHeight: 76, borderTopWidth: index ? 1 : 0, borderTopColor: c.line }}>
-              <Icon icon="Terminal" color={a.id === "claude" ? "#d98b6d" : c.text} size={24} />
+              <Icon icon={officialIcons[a.icon ?? ""] ?? "Terminal"} color={a.id === "claude" ? "#d98b6d" : c.text} size={24} />
               <View style={{ flex: 1, minWidth: 140 }}><Text style={{ ...text, fontWeight: "600" }}>{a.name}</Text><Text style={{ ...muted, marginTop: 4 }}><Text style={{ color: a.wired ? c.green : c.muted }}>● </Text>{a.wired ? "已接入" : "未接入"} · {a.wired ? "模型列表已接入 magpie" : "使用 Agent 自身设置"}</Text></View>
               <Pressable onPress={() => setDetail(a)}><Text style={muted}>详情 ›</Text></Pressable>
               {field && <Pressable disabled={busy} onPress={() => { setQuery(""); setPicker({ agent: a, field }); }} style={{ backgroundColor: c.pill, borderRadius: 7, padding: 10, minWidth: compact ? 140 : 220, maxWidth: "100%" }}><Text numberOfLines={1} style={text}>{field.value || "Agent 默认模型"}  ⌄</Text></Pressable>}
@@ -127,8 +137,8 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
         </>}
         {endpoints[page] && <>
           {!!sectionError && <Text style={{ color: c.red }}>{sectionError}</Text>}
-          {page === "settings" && <View style={{ ...card, ...row }}><Text style={{ ...text, flex: 1 }}>插件外观</Text>{button("浅色", () => setAppearance("light"))}{button("深色", () => setAppearance("dark"))}</View>}
-          <View style={{ ...card, padding: 18, gap: 10 }}><Text style={{ ...text, fontWeight: "600" }}>{label} · 官方接口数据</Text><Text style={muted}>此页正在重建；以下为本机真实数据，尚未达到官方页面的交互与排版。</Text>{section != null && <DataView value={section} color={c.text} muted={c.muted} />}</View>
+          {page === "settings" && <View style={{ ...card, ...row }}><Text style={{ ...text, flex: 1 }}>插件外观</Text>{([ ["system", "跟随 Paseo"], ["light", "浅色"], ["dark", "暗色"] ] as const).map(([value, title]) => <View key={value}>{button(`${appearance === value ? "● " : ""}${title}`, () => void saveAppearance(value))}</View>)}</View>}
+          {!sectionError && <SecondaryPage key={page} page={page} data={section} colors={c} act={act} />}
         </>}
       </ScrollView>
     </View>

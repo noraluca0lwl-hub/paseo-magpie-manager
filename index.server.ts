@@ -8,7 +8,9 @@ import {
   quotaJson, listAgents, setAgentModel, listGroups, addGroup, removeGroup, listModels,
 } from "./shared/contracts";
 import { runMagpie, parseProviders } from "./server/magpie-cli";
-import { officialApi } from "./shared/contracts";
+import { officialApi, panelPreferences } from "./shared/contracts";
+import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
+import { homedir } from "node:os";
 import { officialRequest } from "./server/official-api";
 
 async function fetchQuotas(): Promise<string> {
@@ -21,6 +23,22 @@ async function fetchQuotas(): Promise<string> {
 }
 
 export default function contribute(server: PluginServerContext) {
+  let preferenceQueue = Promise.resolve();
+  server.handle(panelPreferences, async ({ theme }) => {
+    const dir = `${homedir()}/.config/magpie`;
+    const file = `${dir}/paseo-panel.json`;
+    if (theme) {
+      const pending = preferenceQueue.then(async () => {
+        await mkdir(dir, { recursive: true });
+        await writeFile(`${file}.tmp`, JSON.stringify({ theme }), { mode: 0o600 });
+        await rename(`${file}.tmp`, file);
+      });
+      preferenceQueue = pending.catch(() => {});
+      await pending;
+    }
+    const saved = await readFile(file, "utf8").then(s => JSON.parse(s)).catch(() => ({}));
+    return { theme: ["light", "dark"].includes(saved.theme) ? saved.theme as "light" | "dark" : "system" as const };
+  });
   server.handle(officialApi, async ({ path, method, body }) => {
     try { return { ok: true, data: await officialRequest(path, method, body), error: null }; }
     catch (e) { return { ok: false, error: String(e) }; }

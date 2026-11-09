@@ -5,6 +5,12 @@
 import { defineRpc } from "@getpaseo/plugin";
 import { z } from "zod";
 
+export const panelPreferences = defineRpc({
+  name: "magpie.panel.preferences",
+  input: z.object({ theme: z.enum(["system", "light", "dark"]).optional() }),
+  output: z.object({ theme: z.enum(["system", "light", "dark"]) }),
+});
+
 export const officialApi = defineRpc({
   name: "magpie.official",
   input: z.object({ path: z.string(), method: z.enum(["GET", "POST"]).default("GET"), body: z.unknown().optional() }),

@@ -20,10 +20,16 @@ The UI is a native port, not a claim of pixel-identical rendering.
   confirmation, profiles save/use.
 - Providers: official preset list, custom relay, protocol selection, URL/key,
   model IDs, edit, test, delete confirmation; failed save retains input.
-- Secondary pages currently expose bounded structured official data and are
-  explicitly labelled **under reconstruction**; their official interactions are
-  not implemented yet. This is not a complete reproduction of Magpie.
-- No desktop/mobile screenshot acceptance yet.
+- Secondary pages now have dedicated session/resource/group/upstream/quota/
+  masking/plugin/settings layouts. Each page explicitly lists its missing
+  interactions. This is not a complete reproduction of Magpie.
+- Official SVGs for the bird, Claude Code, Codex, Pi, Hermes, library and settings.
+- Appearance: follow Paseo / light / dark, persisted server-side in
+  `~/.config/magpie/paseo-panel.json`, independent of Magpie's own theme.
+- React Native Web preview checked at 1440×1000 and 390×844: navigation, theme
+  switching, drawer and model picker; zero page errors or mobile horizontal
+  overflow. Preview uses a stub Paseo RPC transport and blocks configuration
+  mutations. Actual Paseo desktop/mobile acceptance remains pending.
 
 ## Setup
 
