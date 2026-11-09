@@ -26,7 +26,9 @@ The UI is a native port, not a claim of pixel-identical rendering.
   are wired to official endpoints. Detection results render protocol/status,
   latency, model, endpoint and error rows; per-model results are grouped by model.
   Batch detection allows the official two-minute backend deadline; full Windows
-  result-grid visual parity remains pending. The image picker and built-in icon picker remain pending. Provider editor now
+  result-grid visual parity remains pending. Built-in icon search/selection uses the official MORE_ICONS list plus presets;
+  HTTPS image URLs can be fetched through the official icon endpoint. Local
+  image-file selection remains pending. Provider editor now
   follows Windows source row order and label column: Name, Base URL/protocol,
   key, icon, models, Advanced, More endpoints and trailing cancel/add actions.
   Advanced currently exposes custom Headers; more endpoints exposes all five
