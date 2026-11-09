@@ -10,6 +10,7 @@ import { officialIcons } from "./official-icons";
 import { modelIds, savedModelIds, formHeaders, preservedProviderSettings } from './provider-form';
 import { ProviderModels } from './provider-models';
 import { ModelAdvanced, buildModelChanges } from './model-advanced';
+import {ProviderLimits,limitsFrom,limitsPayload} from './provider-limits';
 import { ProviderAdvanced,emptyAdvanced,advancedFrom,advancedPayload } from './provider-advanced';
 import { providerIcons } from './provider-icons';
 import { ProvidersList, type ProviderRow } from './providers-list';
@@ -65,6 +66,8 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
   const [editing, setEditing] = useState(false);
   const [iconPicker,setIconPicker]=useState(false);const [iconSearch,setIconSearch]=useState('');const [imageUrl,setImageUrl]=useState('');const [imageUrlOpen,setImageUrlOpen]=useState(false);
   const [advancedDraft,setAdvancedDraft]=useState(emptyAdvanced);
+  const [limitsDraft,setLimitsDraft]=useState(()=>limitsFrom());
+  useEffect(()=>{if(editing)setLimitsDraft(limitsFrom(vendors.providers.find(p=>p.id===form.id) as unknown as Record<string,unknown>));},[editing,form.id]);
   const [modelDraft,setModelDraft]=useState<Record<string,Record<string,unknown>>>({});
   useEffect(()=>{setModelDraft({});},[editing,form.id]);
   const [moreEndpoints,setMoreEndpoints]=useState(false);const [advancedProvider,setAdvancedProvider]=useState(false);const [endpointDraft,setEndpointDraft]=useState<Record<string,string>>({});const [headerDraft,setHeaderDraft]=useState('{}');
@@ -200,13 +203,14 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
       <ProviderModels models={listedModels} value={form.models} onChange={models=>setForm(v=>({...v,models}))} busy={busy} colors={c}/>
       <ModelAdvanced ids={modelIds(form.models)} models={[...(vendors.providers.find(p=>p.id===form.id)?.models??[]),...listedModels]} draft={modelDraft} onChange={setModelDraft} colors={c} busy={busy}/>
       {providerField('模型',<><View style={{flexDirection:'row',gap:8,alignItems:'center'}}><TextInput accessibilityLabel="供应商模型 ID" placeholder="模型 ID，逗号分隔" placeholderTextColor={c.muted} value={form.models} onChangeText={v=>setForm({...form,models:v})} style={{...input,flex:1,minWidth:0}} autoCapitalize="none"/>{button('获取模型',()=>void providerInspect(true))}</View><Text style={muted}>可选：获取后勾选或直接填写模型 ID；新增时留空由 Magpie 自动获取；编辑时显示当前选择，清空表示不选择模型。</Text></>)}
-      {providerField('',<>{button(`${advancedProvider?'⌄':'›'} 高级`,()=>setAdvancedProvider(!advancedProvider))}{advancedProvider&&<><Text style={muted}>自定义请求 Headers（字符串值 JSON 对象）</Text><TextInput accessibilityLabel="供应商请求 Headers" multiline value={headerDraft} onChangeText={setHeaderDraft} style={{...input,minHeight:100,textAlignVertical:'top'}}/><ProviderAdvanced value={advancedDraft} onChange={setAdvancedDraft} colors={c} busy={busy}/></>}{button(`${moreEndpoints?'⌄':'›'} 更多端点`,()=>setMoreEndpoints(!moreEndpoints))}{moreEndpoints&&['chat','responses','anthropic','gemini','decide'].filter(k=>k!==form.protocol).map(k=><View key={k} style={{gap:6}}><Text style={muted}>{k}</Text><TextInput accessibilityLabel={`额外端点 ${k}`} autoCapitalize="none" value={endpointDraft[k]??''} onChangeText={v=>setEndpointDraft(d=>({...d,[k]:v}))} style={input}/></View>)}</>)}
+      {providerField('',<>{button(`${advancedProvider?'⌄':'›'} 高级`,()=>setAdvancedProvider(!advancedProvider))}{advancedProvider&&<><Text style={muted}>自定义请求 Headers（字符串值 JSON 对象）</Text><TextInput accessibilityLabel="供应商请求 Headers" multiline value={headerDraft} onChangeText={setHeaderDraft} style={{...input,minHeight:100,textAlignVertical:'top'}}/><ProviderAdvanced value={advancedDraft} onChange={setAdvancedDraft} colors={c} busy={busy}/><ProviderLimits value={limitsDraft} onChange={setLimitsDraft} colors={c} busy={busy}/></>}{button(`${moreEndpoints?'⌄':'›'} 更多端点`,()=>setMoreEndpoints(!moreEndpoints))}{moreEndpoints&&['chat','responses','anthropic','gemini','decide'].filter(k=>k!==form.protocol).map(k=><View key={k} style={{gap:6}}><Text style={muted}>{k}</Text><TextInput accessibilityLabel={`额外端点 ${k}`} autoCapitalize="none" value={endpointDraft[k]??''} onChangeText={v=>setEndpointDraft(d=>({...d,[k]:v}))} style={input}/></View>)}</>)}
       <View style={{flexDirection:'row',justifyContent:'flex-end',gap:10,borderTopWidth:1,borderTopColor:c.line,paddingTop:16}}>{button('取消',()=>setEditing(false))}{button(busy ? "保存中…" : form.id?'保存':'添加', () => {
         if (!form.name.trim() || (!form.id && !form.key.trim())) { setError("名称和新供应商 API Key 为必填项"); return; }
         try { const u = new URL(form.url); if (!["https:", "http:"].includes(u.protocol)) throw new Error(); } catch { setError("请填写有效的 HTTP 或 HTTPS Base URL"); return; }
         let headers:Record<string,string>;try{const value=JSON.parse(headerDraft);if(!value||Array.isArray(value)||typeof value!=='object'||Object.values(value).some(v=>typeof v!=='string'))throw new Error();headers=value;advancedPayload(advancedDraft);for(const address of Object.values(endpointDraft)){if(address.trim()&&!['http:','https:'].includes(new URL(address).protocol))throw new Error();}}catch(e){setError(`配置校验失败：${String(e)}`);return;}
         const existing = vendors.providers.find(p => p.id === form.id);
-        const preserved=preservedProviderSettings(existing as unknown as Record<string,unknown>);
+        let limits;try{limits=limitsPayload(limitsDraft);}catch(e){setError(String(e));return;}
+        const preserved={...preservedProviderSettings(existing as unknown as Record<string,unknown>),...limits};
         let modelChanges;try{modelChanges=buildModelChanges(Object.fromEntries(Object.entries(modelDraft).filter(([id])=>modelIds(form.models).includes(id))),preserved.contexts,preserved.outputs);}catch(e){setError(String(e));return;}
         void act("provider/save", { ...preserved,...modelChanges,baseAPI:form.protocol, chat:'',responses:'',anthropic:'',gemini:'',decide:'',...endpointDraft,headers,...advancedPayload(advancedDraft), id: form.id || form.name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-") || "relay", name: form.name.trim(), icon:form.icon, iconFrom:form.iconFrom, key: form.key.trim(), preset: form.preset, [form.protocol]: form.url.trim(), new: !form.id, models:modelIds(form.models),...(form.id?{noModels:!modelIds(form.models).length}:{}) }, () => { setEditing(false); setForm(freshForm); });
       })}</View>
