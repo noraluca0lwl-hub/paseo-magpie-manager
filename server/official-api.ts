@@ -22,13 +22,14 @@ function allowed(path: string, method: string) {
   const [base, query = ""] = path.split("?");
   if (path.split("?").length > 2) return false;
   const params = new URLSearchParams(query);
-  const queryKeys = base === "library/skill" ? ["name", "file"] : base === "gateway/call" ? ["id"] : ["sessions/transcript", "sessions/manage", "sessions/search", "sessions/markdown"].includes(base) ? ["agent", "id", "q"] : base === "usage/quotas/refresh" ? ["provider", "user"] : [];
+  const queryKeys = base === "library/skill" ? ["name", "file"] : base === "gateway/call" ? ["id"] : ["sessions/transcript", "sessions/manage", "sessions/search", "sessions/markdown", "sessions/export"].includes(base) ? ["agent", "id", "q"] : base === "usage/quotas/refresh" ? ["provider", "user"] : [];
   if ([...params.keys()].some(key => !queryKeys.includes(key))) return false;
   if (query && !queryKeys.length) return false;
   if (method === 'GET' && /^icons\/[a-zA-Z0-9_.-]+$/.test(base)) return true;
   if (base === "library/skill") return method === "GET" && !!params.get("name");
   if (base === "gateway/call") return method === "GET" && /^\d+$/.test(params.get("id") ?? "");
   if (base === "sessions/transcript" || base === "sessions/markdown") return method === "GET" && !!params.get("agent") && !!params.get("id");
+  if (base === "sessions/export") return method === "POST" && !!params.get("agent") && !!params.get("id");
   if (base === "sessions/manage") return method === "GET";
   if (base === "sessions/search") return method === "GET" && !!params.get("agent") && !!params.get("q");
   if (base === "usage/quotas/refresh") return method === "POST" && !!params.get("provider");
