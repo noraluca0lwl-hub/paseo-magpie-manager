@@ -23,7 +23,7 @@ function allowed(path: string, method: string) {
   if (path.split("?").length > 2) return false;
   const params = new URLSearchParams(query);
   const usageRead = ['usage', 'usage/requests', 'usage/heatmap', 'context'].includes(base);
-  const queryKeys = usageRead ? ['period', 'offset', 'limit'] : base === "library/skill" ? ["name", "file"] : base === "gateway/call" ? ["id"] : ["sessions/transcript", "sessions/manage", "sessions/search", "sessions/markdown", "sessions/export"].includes(base) ? ["agent", "id", "q"] : base === "usage/quotas/refresh" ? ["provider", "user"] : [];
+  const queryKeys = usageRead ? ['period', 'offset', 'limit', 'agent', 'provider', 'purpose', 'failed', 'retried', 'q', 'via'] : base === "library/skill" ? ["name", "file"] : base === "gateway/call" ? ["id"] : ["sessions/transcript", "sessions/manage", "sessions/search", "sessions/markdown", "sessions/export"].includes(base) ? ["agent", "id", "q"] : base === "usage/quotas/refresh" ? ["provider", "user"] : [];
   if ([...params.keys()].some(key => !queryKeys.includes(key))) return false;
   if (query && !queryKeys.length) return false;
   if (method === 'GET' && /^icons\/[a-zA-Z0-9_.-]+$/.test(base)) return true;
