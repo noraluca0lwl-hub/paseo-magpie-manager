@@ -21,6 +21,10 @@ The UI is a native port, not a claim of pixel-identical rendering.
 - Providers: official preset list, custom relay, protocol selection, URL/key,
   model IDs, edit, test, delete confirmation; failed save retains input.
   Custom protocol tabs: OpenAI Chat, Responses, Anthropic, Gemini and System One.
+  New providers use non-persistent provider/list; existing providers use
+  provider/models with typed=true and saved-key fallback (refreshes server model
+  cache). Model picker supports filtering, selecting/clearing filtered results,
+  selected counts and bounded scrolling. Upstream dropped picks are removed.
   Unsaved model-list fetch with selection, protocol detection with optional test
   model, per-picked-model detection (official 30-model cap), and key show/hide
   are wired to official endpoints. Detection results render protocol/status,

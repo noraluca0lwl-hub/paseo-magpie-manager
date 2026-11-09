@@ -30,7 +30,7 @@ function allowed(path: string, method: string) {
   if (base === "sessions/transcript") return method === "GET" && !!params.get("agent") && !!params.get("id");
   if (base === "usage/quotas/refresh") return method === "POST" && !!params.get("provider");
   return method === "GET" ? reads.has(base) :
-    /^(icons\/(favicon|url)|set|agents\/rescan|agents\/(connect|disconnect)\/[a-z0-9_-]+|provider\/(save|delete|test|list|detect|on|off)|groups\/(save|delete|switch|template)|profile\/(save|use)|library\/(instructions\/save|servers\/(save|agents|remove)|hooks\/(save|agents|remove)|subagents\/(save|agents|remove)|skills\/(save|agents|remove|probe|install|update))|settings)$/.test(base);
+    /^(icons\/(favicon|url)|set|agents\/rescan|agents\/(connect|disconnect)\/[a-z0-9_-]+|provider\/(save|delete|test|list|models|detect|on|off)|groups\/(save|delete|switch|template)|profile\/(save|use)|library\/(instructions\/save|servers\/(save|agents|remove)|hooks\/(save|agents|remove)|subagents\/(save|agents|remove)|skills\/(save|agents|remove|probe|install|update))|settings)$/.test(base);
 }
 export async function officialRequest(path: string, method = "GET", body?: unknown) {
   if (!allowed(path, method)) throw new Error("此接口未开放给插件");
