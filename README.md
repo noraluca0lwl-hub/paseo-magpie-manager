@@ -31,7 +31,9 @@ The UI is a native port, not a claim of pixel-identical rendering.
   image-file selection remains pending. Provider editor now
   follows Windows source row order and label column: Name, Base URL/protocol,
   key, icon, models, Advanced, More endpoints and trailing cancel/add actions.
-  Advanced currently exposes custom Headers; more endpoints exposes all five
+  Advanced exposes custom Headers, extra JSON body, proxy, models-list URL,
+  HTTP/1.1-only, upstream TLS verification bypass and upstream-error passthrough.
+  Inspection and save share these fields; more endpoints exposes all five
   API URLs. Protocol switching preserves each endpoint rather than clearing it.
   Full Windows advanced options and exact visual parity remain pending.
   Provider icons render from official assets or stored pictures via authenticated
