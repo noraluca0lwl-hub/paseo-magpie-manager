@@ -23,6 +23,12 @@ The UI is a native port, not a claim of pixel-identical rendering.
 - Secondary pages now have dedicated session/resource/group/upstream/quota/
   masking/plugin/settings layouts. Each page explicitly lists its missing
   interactions. This is not a complete reproduction of Magpie.
+- Routing groups: add/edit/delete and template creation via official endpoints;
+  preserves advanced group properties while editing basic fields.
+- Quotas: balance, allowance windows, used-percentage bars, reset time and
+  per-account refresh. Full request statistics remain pending.
+- Browser regression verified failed routing save retains the input and mobile
+  routing editor has no horizontal overflow; writes were blocked in the preview.
 - Official SVGs for the bird, Claude Code, Codex, Pi, Hermes, library and settings.
 - Appearance: follow Paseo / light / dark, persisted server-side in
   `~/.config/magpie/paseo-panel.json`, independent of Magpie's own theme.

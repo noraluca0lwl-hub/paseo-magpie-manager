@@ -85,6 +85,13 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
     setBusy(true); setError("");
     try { await call(path, body); after?.(); await refresh(); } catch (e) { setError(String(e)); } finally { setBusy(false); }
   };
+  const secondaryAct = async (path: string, body: unknown) => {
+    if (busy) throw new Error("已有操作正在执行");
+    setBusy(true); setError("");
+    try { await call(path, body); await refresh(); }
+    catch (e) { setError(String(e)); throw e; }
+    finally { setBusy(false); }
+  };
   const go = (id: Page) => { setPage(id); setDrawer(false); setSearch(""); };
   const item = nav.flatMap(g => g.items).find(i => i.id === page);
   const group = nav.find(g => g.items.some(i => i.id === page))?.group ?? "设置";
@@ -138,7 +145,7 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
         {endpoints[page] && <>
           {!!sectionError && <Text style={{ color: c.red }}>{sectionError}</Text>}
           {page === "settings" && <View style={{ ...card, ...row }}><Text style={{ ...text, flex: 1 }}>插件外观</Text>{([ ["system", "跟随 Paseo"], ["light", "浅色"], ["dark", "暗色"] ] as const).map(([value, title]) => <View key={value}>{button(`${appearance === value ? "● " : ""}${title}`, () => void saveAppearance(value))}</View>)}</View>}
-          {!sectionError && <SecondaryPage key={page} page={page} data={section} colors={c} act={act} />}
+          {!sectionError && <SecondaryPage key={page} page={page} data={section} colors={c} act={secondaryAct} />}
         </>}
       </ScrollView>
     </View>
@@ -155,7 +162,8 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
       {button(busy ? "保存中…" : "保存", () => {
         if (!form.name.trim() || (!form.id && !form.key.trim())) { setError("名称和新供应商 API Key 为必填项"); return; }
         try { const u = new URL(form.url); if (!["https:", "http:"].includes(u.protocol)) throw new Error(); } catch { setError("请填写有效的 HTTP 或 HTTPS Base URL"); return; }
-        void act("provider/save", { id: form.id || form.name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-") || "relay", name: form.name.trim(), key: form.key.trim(), preset: form.preset, [form.protocol]: form.url.trim(), new: !form.id, ...(form.models.trim() ? { models: form.models.split(",").map(s => s.trim()).filter(Boolean) } : {}) }, () => { setEditing(false); setForm(freshForm); });
+        const existing = vendors.providers.find(p => p.id === form.id);
+        void act("provider/save", { ...(existing ?? {}), ...(existing ? { chat: "", anthropic: "", responses: "" } : {}), id: form.id || form.name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-") || "relay", name: form.name.trim(), key: form.key.trim(), preset: form.preset, [form.protocol]: form.url.trim(), new: !form.id, ...(form.models.trim() ? { models: form.models.split(",").map(s => s.trim()).filter(Boolean) } : {}) }, () => { setEditing(false); setForm(freshForm); });
       })}
       {!!error && <Text selectable style={{ color: c.red }}>{error}</Text>}
     </>)}
