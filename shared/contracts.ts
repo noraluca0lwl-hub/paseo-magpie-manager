@@ -5,6 +5,12 @@
 import { defineRpc } from "@getpaseo/plugin";
 import { z } from "zod";
 
+export const officialApi = defineRpc({
+  name: "magpie.official",
+  input: z.object({ path: z.string(), method: z.enum(["GET", "POST"]).default("GET"), body: z.unknown().optional() }),
+  output: z.object({ ok: z.boolean(), data: z.unknown().optional(), error: z.string().nullable() }),
+});
+
 export const ProviderSchema = z.object({
   id: z.string(),
   name: z.string(),

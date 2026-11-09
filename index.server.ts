@@ -8,6 +8,8 @@ import {
   quotaJson, listAgents, setAgentModel, listGroups, addGroup, removeGroup, listModels,
 } from "./shared/contracts";
 import { runMagpie, parseProviders } from "./server/magpie-cli";
+import { officialApi } from "./shared/contracts";
+import { officialRequest } from "./server/official-api";
 
 async function fetchQuotas(): Promise<string> {
   try {
@@ -19,6 +21,10 @@ async function fetchQuotas(): Promise<string> {
 }
 
 export default function contribute(server: PluginServerContext) {
+  server.handle(officialApi, async ({ path, method, body }) => {
+    try { return { ok: true, data: await officialRequest(path, method, body), error: null }; }
+    catch (e) { return { ok: false, error: String(e) }; }
+  });
   server.handle(listProviders, async () => {
     const r = await runMagpie(["providers"]);
     if (!r.ok) return { ok: false, providers: [], raw: r.output, error: r.error };

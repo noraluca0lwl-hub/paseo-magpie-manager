@@ -1,514 +1,165 @@
-/**
- * client/panel.tsx — Magpie Manager panel, mirroring magpie's window layout:
- * a left sidebar (grouped: Work / Models / Insights / Extend, official icons,
- * 26px rows, 12.5px labels, selected row in the text's own ink) and the open
- * view's content on the right. Design tokens are magpie's own (app.css).
+/** Paseo-native panel. Layout reference: yetone/magpie c7ebb6f internal/gui/assets.
+ * No iframe, public listener, browser-only DOM, or client-side Magpie credentials.
  */
-import { type PluginAgentPanelProps, type PluginScreenProps, useRpc } from "@getpaseo/plugin/client";
-import { useToast } from "@getpaseo/plugin/client/ui";
-import { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Modal,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-  Image as RNImage,
-} from "react-native";
+import { type PluginAgentPanelProps, useRpc } from "@getpaseo/plugin/client";
+import { Icon } from "@getpaseo/plugin/client/ui";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Modal, Pressable, ScrollView, Switch, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { officialApi } from "../shared/contracts";
+import { I_agents, I_sessions, I_providers, I_routing, I_gateway, I_usage, I_masking, I_plugins } from "./nav-icons";
 
-import {
-  listProviders, addProvider, removeProvider, testProvider, setProviderKey, presets, webUiUrl,
-  quotaJson, listAgents, setAgentModel, listGroups, addGroup, removeGroup, listModels,
-} from "../shared/contracts";
-import { I_agents, I_sessions, I_providers, I_routing, I_groups, I_gateway, I_usage, I_masking, I_plugins } from "./nav-icons";
+type Option = { value: string; label?: string; note?: string; group?: string };
+type Field = { key: string; label: string; value: string; options: Option[] };
+type Agent = { id: string; name: string; wired?: boolean; path: string; fields: Field[]; models?: number };
+type Provider = { id: string; name: string; chat?: string; anthropic?: string; responses?: string; models?: unknown[]; key?: string; preset?: string };
+type State = { agents: Agent[]; profiles: { name: string }[]; settings?: Record<string, unknown> };
+type Providers = { providers: Provider[]; presets: (Provider & { kind?: string })[] };
+type Page = "agents" | "sessions" | "library" | "providers" | "routing" | "gateway" | "usage" | "masking" | "plugins" | "settings";
+const nav: { group: string; items: { id: Page; label: string; icon: { svg: string } | string }[] }[] = [
+  { group: "使用", items: [{ id: "agents", label: "Agent", icon: I_agents }, { id: "sessions", label: "会话", icon: I_sessions }, { id: "library", label: "资源库", icon: "BookOpen" }] },
+  { group: "模型", items: [{ id: "providers", label: "供应商", icon: I_providers }, { id: "routing", label: "路由", icon: I_routing }, { id: "gateway", label: "网关", icon: I_gateway }] },
+  { group: "观测", items: [{ id: "usage", label: "用量", icon: I_usage }, { id: "masking", label: "脱敏", icon: I_masking }] },
+  { group: "扩展", items: [{ id: "plugins", label: "插件", icon: I_plugins }] },
+];
+const endpoints: Partial<Record<Page, string>> = { sessions: "sessions", library: "library", routing: "groups", gateway: "upstream", usage: "usage/quotas", masking: "masking/summary", plugins: "plugins", settings: "settings" };
+const freshForm = { id: "", name: "", key: "", url: "", protocol: "chat", preset: "", models: "" };
 
-const MONO = Platform.select({ ios: "Menlo", default: "monospace" });
-
-function isDark(hex: string): boolean {
-  const m = hex.replace("#", "");
-  const r = parseInt(m.slice(0, 2), 16);
-  const g = parseInt(m.slice(2, 4), 16);
-  const b = parseInt(m.slice(4, 6), 16);
-  return (r * 299 + g * 587 + b * 114) / 1000 < 128;
-}
-
-/** magpie app.css tokens, light and dark. */
-function tokens(theme: PluginAgentPanelProps["theme"]) {
-  const dark = isDark(theme.colors.surface0);
-  return {
-    bg: dark ? "#1a1a1e" : "#f4f4f6",
-    card: dark ? "#232327" : "#ffffff",
-    card2: dark ? "#1f1f23" : "#f9f9fb",
-    pill: dark ? "#2d2d33" : "#f1f1f4",
-    pillHover: dark ? "#36363d" : "#e9e9ee",
-    line: dark ? "#333339" : "#e3e3e8",
-    line2: dark ? "#2c2c32" : "#ececf0",
-    fg: dark ? "#ededf1" : "#1c1c21",
-    fg2: dark ? "#b9b9c1" : "#4b4b53",
-    muted: dark ? "#8b8b94" : "#85858d",
-    faint: dark ? "#56565f" : "#b9b9c2",
-    ctlFg: dark ? "#a1a1aa" : "#63636b",
-    accent: dark ? "#a5b4fc" : "#4f46e5",
-    accentFg: dark ? "#14142a" : "#ffffff",
-    green: dark ? "#6fd99b" : "#189a58",
-    red: dark ? "#f28b82" : "#d64545",
-    redSoft: dark ? "#45272a" : "#fbe9e9",
-    // the sidebar's selected row: no colour of its own, the page open in the
-    // text's own ink (magpie: "graphite, as a Mac sidebar is")
-    sideBg: dark ? "#1b1c20" : "#f2f2f5",
-    sideSel: dark ? "#25262c" : "#ffffff",
-  };
-}
-
-type Prov = { id: string; name: string; host: string | null; models: number | null; usedBy: string[] };
-type Preset = { label: string; id: string; group: string };
-type Agent = { name: string; detail: string; detected: boolean };
-type Group = { id: string; raw: string };
-type PageView = "agents" | "sessions" | "providers" | "routing" | "groups" | "gateway" | "usage" | "masking" | "plugins";
-
-type PluginScreenPropsLike = Pick<PluginAgentPanelProps, "theme"> & Partial<PluginScreenProps>;
-
-export function MagpieManagerPanel(props: PluginAgentPanelProps | PluginScreenPropsLike) {
-  const t = tokens(props.theme);
-  const toast = useToast();
-  const list = useRpc(listProviders);
-  const add = useRpc(addProvider);
-  const remove = useRpc(removeProvider);
-  const test = useRpc(testProvider);
-  const setKey = useRpc(setProviderKey);
-  const listPresets = useRpc(presets);
-  const webUi = useRpc(webUiUrl);
-  const quota = useRpc(quotaJson);
-  const agents = useRpc(listAgents);
-  const setAgent = useRpc(setAgentModel);
-  const groups = useRpc(listGroups);
-  const mkGroup = useRpc(addGroup);
-  const rmGroup = useRpc(removeGroup);
-  const models = useRpc(listModels);
-
-  const [view, setView] = useState<PageView>("providers");
-  const [data, setData] = useState<{ providers: Prov[] } | null>(null);
-  const [presetList, setPresetList] = useState<Preset[]>([]);
-  const [quotaRaw, setQuotaRaw] = useState<string | null>(null);
-  const [agentList, setAgentList] = useState<Agent[]>([]);
-  const [groupList, setGroupList] = useState<Group[]>([]);
-  const [modelList, setModelList] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [showAdd, setShowAdd] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editKey, setEditKey] = useState("");
-  const [groupForm, setGroupForm] = useState({ name: "", models: "", routing: "smart" });
-  const [showGroupAdd, setShowGroupAdd] = useState(false);
-  const [form, setForm] = useState({ name: "", key: "", baseUrl: "" });
-
+export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme">) {
+  const rpc = useRpc(officialApi);
+  const { width } = useWindowDimensions();
+  const compact = width < 700;
+  const [page, setPage] = useState<Page>("agents");
+  const [drawer, setDrawer] = useState(false);
+  const [appearance, setAppearance] = useState<"light" | "dark">("light");
+  const dark = appearance === "dark";
+  const c = { bg: dark ? "#1b1c20" : "#f2f2f5", card: dark ? "#25262c" : "#ffffff", text: dark ? "#ededf1" : "#202124", muted: dark ? "#9c9ca6" : "#83858e", line: dark ? "#34353b" : "#e4e5e9", pill: dark ? "#303139" : "#f0f0f3", purple: dark ? "#a5a0ff" : "#7662ff", green: "#16a56b", red: "#d54949" };
+  const [state, setState] = useState<State | null>(null);
+  const [vendors, setVendors] = useState<Providers>({ providers: [], presets: [] });
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [expanded, setExpanded] = useState(false);
+  const [detail, setDetail] = useState<Agent | null>(null);
+  const [picker, setPicker] = useState<{ agent: Agent; field: Field } | null>(null);
+  const [query, setQuery] = useState("");
+  const [form, setForm] = useState(freshForm);
+  const [editing, setEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<Provider | null>(null);
+  const [confirmDisconnect, setConfirmDisconnect] = useState<Agent | null>(null);
+  const [profileName, setProfileName] = useState<string | null>(null);
+  const [section, setSection] = useState<unknown>(null);
+  const [sectionError, setSectionError] = useState("");
+  const [search, setSearch] = useState("");
+  const generation = useRef(0);
+  const call = useCallback(async (path: string, body?: unknown) => {
+    const r = await rpc({ path, method: body === undefined ? "GET" : "POST", body });
+    if (!r.ok) throw new Error(r.error ?? "Magpie 请求失败");
+    return r.data;
+  }, [rpc]);
   const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [l, q, a, g, m] = await Promise.all([
-        list({}),
-        quota({}).catch(() => null),
-        agents({}).catch(() => null),
-        groups({}).catch(() => null),
-        models({}).catch(() => null),
-      ]);
-      setData(l);
-      setQuotaRaw(q?.ok ? q.body : null);
-      if (a?.ok) setAgentList(a.agents);
-      if (g?.ok) setGroupList(g.groups);
-      if (m?.ok) setModelList(m.models);
-    } catch (e) {
-      setErr(String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [list, quota, agents, groups, models]);
-
-  useEffect(() => {
-    void refresh();
-    void listPresets({}).then((r) => setPresetList(r.presets)).catch(() => {});
-    void webUi({}).then(() => {}).catch(() => {});
-  }, [refresh, listPresets, webUi]);
-
-  const run = useCallback(
-    async (label: string, fn: () => Promise<{ ok: boolean; error?: string | null }>) => {
-      setBusy(label);
-      setErr(null);
-      try {
-        const r = await fn();
-        if (!r.ok) { setErr(r.error ?? "failed"); toast.error(`${label} failed`); }
-        else toast.show(`${label} ok`);
-        await refresh();
-      } catch (e) {
-        setErr(String(e));
-        toast.error(String(e));
-      } finally {
-        setBusy(null);
-      }
-    },
-    [refresh, toast],
-  );
-
-  const submitAdd = async () => {
-    await run("add", () =>
-      add({ name: form.name.trim(), key: form.key.trim(), baseUrl: form.baseUrl.trim() || undefined }),
-    );
-    setForm({ name: "", key: "", baseUrl: "" });
-    setShowAdd(false);
+    const g = ++generation.current;
+    setLoading(true); setError(""); setSectionError(""); setSection(null);
+    const results = await Promise.allSettled([call("state"), call("providers"), endpoints[page] ? call(endpoints[page]!) : Promise.resolve(null)]);
+    if (g !== generation.current) return;
+    if (results[0].status === "fulfilled") setState(results[0].value as State);
+    else setError(String(results[0].reason));
+    if (results[1].status === "fulfilled") setVendors(results[1].value as Providers);
+    else setError(e => [e, String(results[1].status === "rejected" ? results[1].reason : "")].filter(Boolean).join("\n"));
+    if (results[2].status === "fulfilled") setSection(results[2].value);
+    else setSectionError(String(results[2].reason));
+    setLoading(false);
+  }, [call, page]);
+  useEffect(() => { void refresh(); return () => { generation.current++; }; }, [refresh]);
+  const act = async (path: string, body: unknown, after?: () => void) => {
+    if (busy) return;
+    setBusy(true); setError("");
+    try { await call(path, body); after?.(); await refresh(); } catch (e) { setError(String(e)); } finally { setBusy(false); }
   };
-
-  // ---- magpie's sidebar: groups + views, official icons -------------------
-  const NAV: Array<{ group: string; items: Array<{ view: PageView; label: string; icon: { svg: string } }> }> = [
-    { group: "Work", items: [
-      { view: "agents", label: "Agents", icon: I_agents },
-      { view: "sessions", label: "Sessions", icon: I_sessions },
-    ]},
-    { group: "Models", items: [
-      { view: "providers", label: "Providers", icon: I_providers },
-      { view: "routing", label: "Routing", icon: I_routing },
-      { view: "groups", label: "Routing groups", icon: I_groups },
-      { view: "gateway", label: "Gateway", icon: I_gateway },
-    ]},
-    { group: "Insights", items: [
-      { view: "usage", label: "Usage", icon: I_usage },
-      { view: "masking", label: "Masking", icon: I_masking },
-    ]},
-    { group: "Extend", items: [
-      { view: "plugins", label: "Plugins", icon: I_plugins },
-    ]},
-  ];
-
-  // ---- styles (magpie app.css values) -------------------------------------
-  const s = {
-    screen: { flex: 1, backgroundColor: t.bg, flexDirection: "row" as const },
-    sidebar: { width: 176, backgroundColor: t.sideBg, borderRightWidth: 1, borderRightColor: t.line2, paddingTop: 10 },
-    brand: { flexDirection: "row" as const, alignItems: "center" as const, gap: 7, paddingHorizontal: 14, paddingBottom: 10 },
-    brandText: { color: t.fg, fontSize: 13.5, fontWeight: "600" as const },
-    navGl: { color: t.faint, fontSize: 11, fontWeight: "600" as const, letterSpacing: 0.4, textTransform: "uppercase" as const, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4 },
-    navBtn: { flexDirection: "row" as const, alignItems: "center" as const, gap: 8, height: 26, paddingHorizontal: 10, marginHorizontal: 6, borderRadius: 6 },
-    navBtnOn: { backgroundColor: t.sideSel },
-    navLabel: { fontSize: 12.5, color: t.ctlFg },
-    navLabelOn: { fontSize: 12.5, color: t.fg, fontWeight: "500" as const },
-    content: { flex: 1, backgroundColor: t.bg },
-    contentScroll: { flex: 1 },
-    head: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8, gap: 4 },
-    headRow: { flexDirection: "row" as const, alignItems: "center" as const, gap: 8 },
-    title: { color: t.fg, fontSize: 15, fontWeight: "600" as const, letterSpacing: -0.2, flex: 1 },
-    sub: { color: t.muted, fontSize: 11.5 },
-    list: { backgroundColor: t.card, borderColor: t.line, borderWidth: 1, borderRadius: 12, marginHorizontal: 12, overflow: "hidden" as const },
-    row: { flexDirection: "row" as const, alignItems: "center" as const, gap: 9, minHeight: 40, paddingHorizontal: 11, paddingVertical: 5 },
-    rowBorder: { borderTopWidth: 1, borderTopColor: t.line2 },
-    name: { color: t.fg, fontWeight: "500" as const, fontSize: 13 },
-    host: { color: t.muted, fontSize: 11.5, fontFamily: MONO, marginTop: 1 },
-    meta: { color: t.faint, fontSize: 11, marginTop: 1 },
-    textBtn: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, backgroundColor: t.pill },
-    textBtnLabel: { color: t.fg2, fontSize: 12 },
-    primary: { backgroundColor: t.accent, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, marginTop: 8 },
-    primaryLabel: { color: t.accentFg, fontSize: 12.5, fontWeight: "600" as const },
-    quiet: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 7, backgroundColor: t.pill },
-    quietLabel: { color: t.fg2, fontSize: 12.5, fontWeight: "500" as const },
-    input: { color: t.fg, backgroundColor: t.pill, borderRadius: 6, paddingHorizontal: 8, height: 28, fontSize: 12.5, marginBottom: 6 },
-    form: { marginHorizontal: 12, marginTop: 10, backgroundColor: t.card, borderWidth: 1, borderColor: t.line, borderRadius: 12, padding: 12 },
-    formTitle: { color: t.fg, fontSize: 13, fontWeight: "600" as const, marginBottom: 6 },
-    empty: { padding: 36, alignItems: "center" as const },
-    emptyB: { color: t.fg, fontSize: 13, fontWeight: "500" as const, marginBottom: 4 },
-    emptySub: { color: t.muted, fontSize: 12, textAlign: "center" as const },
-    errBox: { marginHorizontal: 12, marginTop: 8, backgroundColor: t.redSoft, borderRadius: 8, padding: 8 },
-    errText: { color: t.red, fontSize: 11.5 },
-    modalCard: { margin: 16, backgroundColor: t.card, borderRadius: 12, borderWidth: 1, borderColor: t.line, padding: 12 },
-    presetRow: { flexDirection: "row" as const, alignItems: "center" as const, gap: 8, paddingVertical: 8, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: t.line2 },
-    presetLabel: { color: t.fg, fontSize: 12.5, flex: 1 },
-    presetId: { color: t.muted, fontSize: 11, fontFamily: MONO },
-    mono: { color: t.fg2, fontFamily: MONO, fontSize: 11.5, lineHeight: 18 },
-  };
-
-  const providers = data?.providers ?? [];
-  const grouped = presetList.reduce<Record<string, Preset[]>>((acc, p) => {
-    (acc[p.group] ??= []).push(p);
-    return acc;
-  }, {});
-
-  return (
-    <View style={s.screen}>
-      {/* ---- sidebar (magpie's window layout) ---- */}
-      <View style={s.sidebar}>
-        <View style={s.brand}>
-          <Text style={s.brandText}>magpie</Text>
-        </View>
-        {NAV.map((g) => (
-          <View key={g.group}>
-            <Text style={s.navGl}>{g.group}</Text>
-            {g.items.map((it) => (
-              <Pressable
-                key={it.view}
-                style={[s.navBtn, view === it.view && s.navBtnOn]}
-                onPress={() => setView(it.view)}
-              >
-                <View style={{ width: 16, height: 16 }}>
-                  <SvgIcon icon={it.icon} size={16} color={view === it.view ? t.fg : t.muted} />
-                </View>
-                <Text style={view === it.view ? s.navLabelOn : s.navLabel}>{it.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-        ))}
+  const go = (id: Page) => { setPage(id); setDrawer(false); setSearch(""); };
+  const item = nav.flatMap(g => g.items).find(i => i.id === page);
+  const group = nav.find(g => g.items.some(i => i.id === page))?.group ?? "设置";
+  const label = item?.label ?? "设置";
+  const text = { color: c.text, fontSize: 14 };
+  const muted = { color: c.muted, fontSize: 13 };
+  const card = { backgroundColor: c.card, borderWidth: 1, borderColor: c.line, borderRadius: 14, overflow: "hidden" as const };
+  const row = { padding: 16, gap: 12, flexDirection: "row" as const, alignItems: "center" as const, flexWrap: "wrap" as const };
+  const input = { color: c.text, backgroundColor: c.pill, borderRadius: 7, padding: 11, fontSize: 14, minHeight: 42 };
+  const button = (title: string, action: () => void, danger = false) => <Pressable accessibilityRole="button" disabled={busy} onPress={action} style={{ paddingVertical: 9, paddingHorizontal: 12, borderRadius: 7, backgroundColor: c.pill, opacity: busy ? .5 : 1 }}><Text style={{ color: danger ? c.red : c.text, fontSize: 13 }}>{title}</Text></Pressable>;
+  const sidebar = <View style={{ flex: 1, backgroundColor: c.bg, borderRightWidth: 1, borderRightColor: c.line }}>
+    <View style={{ height: 46, paddingHorizontal: 18, flexDirection: "row", alignItems: "center", gap: 8 }}><Icon icon="PanelLeft" size={16} color={c.muted} /><Text style={text}>magpie</Text>{compact && button("关闭", () => setDrawer(false))}</View>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 10, paddingBottom: 20 }}>
+      {nav.map(g => <View key={g.group}><Text style={{ ...muted, paddingHorizontal: 8, paddingTop: 17, paddingBottom: 6, fontSize: 12 }}>{g.group}</Text>{g.items.map(i => <Pressable key={i.id} onPress={() => go(i.id)} accessibilityRole="button" accessibilityState={{ selected: page === i.id }} style={{ height: 38, borderRadius: 7, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: page === i.id ? c.card : "transparent", borderWidth: page === i.id ? 1 : 0, borderColor: c.line }}><Icon icon={i.icon} size={16} color={page === i.id ? c.text : c.muted} /><Text style={text}>{i.label}</Text></Pressable>)}</View>)}
+    </ScrollView>
+    <Pressable onPress={() => go("settings")} style={{ ...row, borderTopWidth: 1, borderTopColor: c.line }}><Icon icon="Settings" size={16} color={c.muted} /><Text style={text}>设置</Text></Pressable>
+  </View>;
+  const modal = (visible: boolean, close: () => void, title: string, children: React.ReactNode) => <Modal visible={visible} transparent animationType="fade" onRequestClose={close}><View style={{ flex: 1, backgroundColor: "rgba(0,0,0,.35)", justifyContent: "center", padding: compact ? 12 : 40 }}><View style={{ ...card, width: "100%", maxWidth: 640, maxHeight: "90%", alignSelf: "center" }}><View style={row}><Text style={{ ...text, fontWeight: "600", flex: 1 }}>{title}</Text>{button("关闭", close)}</View><ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>{children}</ScrollView></View></View></Modal>;
+  const shown = expanded ? state?.agents ?? [] : (state?.agents ?? []).slice(0, 2);
+  return <View style={{ flex: 1, flexDirection: "row", backgroundColor: c.bg }}>
+    {!compact && <View style={{ width: 212 }}>{sidebar}</View>}
+    <View style={{ flex: 1, minWidth: 0 }}>
+      <View style={{ ...row, minHeight: 52, paddingVertical: 10 }}>
+        {compact && button("☰", () => setDrawer(true))}<Text style={{ ...muted, flex: 1 }}>{group}  /  <Text style={{ color: c.text, fontWeight: "600" }}>{label}</Text></Text>
+        {loading ? <ActivityIndicator color={c.purple} /> : button("刷新", () => void refresh())}
       </View>
-
-      {/* ---- content ---- */}
-      <ScrollView
-        style={s.content}
-        contentContainerStyle={{ paddingBottom: 24 }}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={t.muted} />}
-      >
-        <View style={s.head}>
-          <View style={s.headRow}>
-            <Text style={s.title}>{NAV.flatMap((g) => g.items).find((i) => i.view === view)?.label}</Text>
-            {view === "providers" && (
-              <Pressable style={s.quiet} onPress={() => setShowAdd(true)}>
-                <Text style={s.quietLabel}>+ Add</Text>
-              </Pressable>
-            )}
-            {view === "groups" && (
-              <Pressable style={s.quiet} onPress={() => setShowGroupAdd(true)}>
-                <Text style={s.quietLabel}>+ Add</Text>
-              </Pressable>
-            )}
+      <ScrollView contentContainerStyle={{ padding: compact ? 14 : 32, paddingTop: 16, paddingBottom: 48, gap: 18 }}>
+        {!!error && <View accessibilityRole="alert" style={{ ...card, padding: 14 }}><Text selectable style={{ color: c.red }}>{error}</Text>{button("重试", () => void refresh())}</View>}
+        {page === "agents" && <>
+          <Text style={{ ...muted, lineHeight: 22 }}>打开「接入」后，magpie 中配置的模型会作为 magpie 供应商出现在 agent 的模型列表里；也可在此直接选模型。</Text>
+          <View style={card}>
+            {shown.map((a, index) => { const field = a.fields.find(f => f.key === "model") ?? a.fields.find(f => ["large", "executor", "planner"].includes(f.label)); return <View key={a.id} style={{ ...row, minHeight: 76, borderTopWidth: index ? 1 : 0, borderTopColor: c.line }}>
+              <Icon icon="Terminal" color={a.id === "claude" ? "#d98b6d" : c.text} size={24} />
+              <View style={{ flex: 1, minWidth: 140 }}><Text style={{ ...text, fontWeight: "600" }}>{a.name}</Text><Text style={{ ...muted, marginTop: 4 }}><Text style={{ color: a.wired ? c.green : c.muted }}>● </Text>{a.wired ? "已接入" : "未接入"} · {a.wired ? "模型列表已接入 magpie" : "使用 Agent 自身设置"}</Text></View>
+              <Pressable onPress={() => setDetail(a)}><Text style={muted}>详情 ›</Text></Pressable>
+              {field && <Pressable disabled={busy} onPress={() => { setQuery(""); setPicker({ agent: a, field }); }} style={{ backgroundColor: c.pill, borderRadius: 7, padding: 10, minWidth: compact ? 140 : 220, maxWidth: "100%" }}><Text numberOfLines={1} style={text}>{field.value || "Agent 默认模型"}  ⌄</Text></Pressable>}
+              <Switch accessibilityLabel={`${a.name} 接入 Magpie`} value={!!a.wired} disabled={busy} trackColor={{ false: c.line, true: c.text }} onValueChange={on => on ? void act(`agents/connect/${a.id}`, {}) : setConfirmDisconnect(a)} />
+            </View>; })}
+            {!state && loading && <View style={row}><ActivityIndicator /><Text style={muted}>正在读取本机 Agent…</Text></View>}
+            {state?.agents.length === 0 && <View style={row}><Text style={muted}>本机尚未发现 Agent。</Text></View>}
+            {!!state && state.agents.length > 2 && <Pressable onPress={() => setExpanded(!expanded)} style={{ padding: 12, borderTopWidth: 1, borderTopColor: c.line }}><Text style={{ ...muted, textAlign: "center" }}>{expanded ? "收起" : `显示其余 ${state.agents.length - 2} 个`} ⌄</Text></Pressable>}
           </View>
-        </View>
-
-        {view === "providers" && (
-          <View style={s.list}>
-            {!loading && providers.length === 0 ? (
-              <View style={s.empty}>
-                <Text style={s.emptyB}>No providers yet</Text>
-                <Text style={s.emptySub}>Tap “+ Add” — a preset vendor + key, or a custom relay with a base URL.</Text>
-              </View>
-            ) : (
-              providers.map((p, i) => (
-                <View key={p.id} style={[s.row, i > 0 && s.rowBorder]}>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={s.name} numberOfLines={1}>{p.name}</Text>
-                    {p.host ? <Text style={s.host} numberOfLines={1}>{p.host}</Text> : null}
-                    <Text style={s.meta} numberOfLines={1}>
-                      {p.models != null ? `${p.models} models` : ""}
-                      {p.models != null && p.usedBy.length > 0 ? " · " : ""}
-                      {p.usedBy.length > 0 ? `used by ${p.usedBy.join(", ")}` : ""}
-                    </Text>
-                  </View>
-                  {busy === `test:${p.id}` ? (
-                    <ActivityIndicator size="small" color={t.muted} />
-                  ) : (
-                    <Pressable style={s.textBtn} onPress={() => run(`test:${p.id}`, () => test({ id: p.id }))}>
-                      <Text style={s.textBtnLabel}>Test</Text>
-                    </Pressable>
-                  )}
-                  <Pressable style={s.textBtn} onPress={() => { setEditId(p.id); setEditKey(""); }}>
-                    <Text style={s.textBtnLabel}>Key</Text>
-                  </Pressable>
-                  {busy === `rm:${p.id}` ? null : (
-                    <Pressable style={s.textBtn} onPress={() => run(`rm:${p.id}`, () => remove({ id: p.id }))}>
-                      <Text style={{ ...s.textBtnLabel, color: t.red }}>Remove</Text>
-                    </Pressable>
-                  )}
-                </View>
-              ))
-            )}
-            {loading && data == null ? (
-              <View style={[s.row, { justifyContent: "center" }]}>
-                <ActivityIndicator color={t.muted} />
-              </View>
-            ) : null}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flexWrap: "wrap" }}><Text style={{ ...muted, fontWeight: "600" }}>方案</Text>{state?.profiles.length ? state.profiles.map(p => button(p.name, () => void act("profile/use", { name: p.name }))) : <Text style={muted}>还没有 · 保存当前设置，之后一键切回</Text>}{button("＋ 保存当前", () => setProfileName(""))}</View>
+        </>}
+        {page === "providers" && <>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}><TextInput accessibilityLabel="查找供应商" style={{ ...input, flex: 1 }} placeholder="查找供应商" placeholderTextColor={c.muted} value={search} onChangeText={setSearch} />{button("＋ 添加供应商", () => { setForm(freshForm); setEditing(true); })}</View>
+          <View style={card}>{vendors.providers.filter(p => `${p.name} ${p.id}`.toLowerCase().includes(search.toLowerCase())).map((p, i) => <View key={p.id} style={{ ...row, borderTopWidth: i ? 1 : 0, borderTopColor: c.line }}><Icon icon={I_providers} size={20} color={c.muted} /><View style={{ flex: 1, minWidth: 120 }}><Text style={{ ...text, fontWeight: "600" }}>{p.name || p.id}</Text><Text numberOfLines={1} style={muted}>{p.chat || p.anthropic || p.responses || p.preset || p.id}</Text></View>{button("编辑", () => { setForm({ ...freshForm, id: p.id, name: p.name, url: p.chat || p.anthropic || p.responses || "", protocol: p.anthropic ? "anthropic" : p.responses ? "responses" : "chat", preset: p.preset ?? "" }); setEditing(true); })}{button("测试", () => void act("provider/test", { id: p.id }))}{button("删除", () => setConfirmDelete(p), true)}</View>)}
+            {!vendors.providers.length && !loading && <View style={{ padding: 40, gap: 10, alignItems: "center" }}><Text style={text}>尚未添加供应商</Text><Text style={muted}>添加订阅供应商或自定义中转，配置 URL 和 API Key。</Text></View>}
           </View>
-        )}
-
-        {view === "agents" && (
-          <View style={s.list}>
-            {agentList.map((a, i) => (
-              <View key={a.name} style={[s.row, i > 0 && s.rowBorder, !a.detected && { opacity: 0.45 }]}>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[s.name, !a.detected && { color: t.muted }]} numberOfLines={1}>{a.name}</Text>
-                  <Text style={s.meta} numberOfLines={1}>{a.detail || (a.detected ? "detected" : "not detected")}</Text>
-                </View>
-              </View>
-            ))}
-            {agentList.length === 0 && !loading ? (
-              <View style={s.empty}>
-                <Text style={s.emptyB}>No agents detected</Text>
-                <Text style={s.emptySub}>magpie reads installed agent CLIs on this host.</Text>
-              </View>
-            ) : null}
-          </View>
-        )}
-
-        {view === "groups" && (
-          <View style={s.list}>
-            {groupList.length === 0 ? (
-              <View style={s.empty}>
-                <Text style={s.emptyB}>No routing groups yet</Text>
-                <Text style={s.emptySub}>A group fails over between models: agents pick it as group/&lt;id&gt;.</Text>
-              </View>
-            ) : (
-              groupList.map((g, i) => (
-                <View key={g.id} style={[s.row, i > 0 && s.rowBorder]}>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={s.name} numberOfLines={1}>{g.id}</Text>
-                    <Text style={s.meta} numberOfLines={2}>{g.raw}</Text>
-                  </View>
-                  {busy === `grm:${g.id}` ? null : (
-                    <Pressable style={s.textBtn} onPress={() => run(`grm:${g.id}`, () => rmGroup({ id: g.id }))}>
-                      <Text style={{ ...s.textBtnLabel, color: t.red }}>Remove</Text>
-                    </Pressable>
-                  )}
-                </View>
-              ))
-            )}
-          </View>
-        )}
-
-        {(view === "routing" || view === "gateway" || view === "sessions" || view === "masking" || view === "plugins") && (
-          <View style={[s.list, { padding: 12 }]}>
-            <Text style={s.emptySub}>
-              {view === "plugins" ? "magpie plugins live in the magpie app itself — this panel manages providers, agents, groups and usage." : "This page lives in magpie's own window. This panel manages providers, agents, groups and usage."}
-            </Text>
-          </View>
-        )}
-
-        {view === "usage" && (
-          <View style={[s.list, { padding: 12 }]}>
-            {quotaRaw == null ? (
-              <View style={[s.row, { justifyContent: "center" }]}>
-                <Text style={s.emptySub}>nothing to tell · a signed-in plan or a key whose vendor shows its balance appears here</Text>
-              </View>
-            ) : (
-              <Text style={s.mono} selectable>{quotaRaw}</Text>
-            )}
-          </View>
-        )}
-
-        {/* ---- edit-key modal ---- */}
-        <Modal visible={editId != null} transparent animationType="fade" onRequestClose={() => setEditId(null)}>
-          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,.35)", justifyContent: "center" }}>
-            <View style={s.modalCard}>
-              <Text style={s.formTitle}>Set key · {editId}</Text>
-              <TextInput style={s.input} placeholder="new API key" placeholderTextColor={t.faint}
-                value={editKey} onChangeText={setEditKey} autoCapitalize="none" secureTextEntry />
-              <Pressable style={s.primary} disabled={!editKey.trim() || busy === "setkey"}
-                onPress={async () => {
-                  const id = editId!;
-                  setEditId(null);
-                  await run(`setkey:${id}`, () => setKey({ id, key: editKey.trim() }));
-                }}>
-                <Text style={s.primaryLabel}>{busy === "setkey" ? "Saving…" : "Save key"}</Text>
-              </Pressable>
-              <Pressable style={{ marginTop: 6 }} onPress={() => setEditId(null)}>
-                <Text style={{ color: t.muted, fontSize: 12.5, textAlign: "center" }}>Cancel</Text>
-              </Pressable>
-            </View>
-          </View>
-        </Modal>
-
-        {/* ---- add provider modal ---- */}
-        <Modal visible={showAdd} transparent animationType="slide" onRequestClose={() => setShowAdd(false)}>
-          <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: 22 }}>
-            <View style={[s.head, { flexDirection: "row", alignItems: "center" }]}>
-              <Text style={s.title}>Add provider</Text>
-              <Pressable style={s.quiet} onPress={() => setShowAdd(false)}>
-                <Text style={s.quietLabel}>Close</Text>
-              </Pressable>
-            </View>
-            <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
-              <View style={s.form}>
-                <Text style={s.formTitle}>Custom relay</Text>
-                <TextInput style={s.input} placeholder="name (e.g. my-relay)" placeholderTextColor={t.faint}
-                  value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} />
-                <TextInput style={s.input} placeholder="API key (sk-…)" placeholderTextColor={t.faint}
-                  value={form.key} onChangeText={(v) => setForm({ ...form, key: v })} autoCapitalize="none" />
-                <TextInput style={s.input} placeholder="base URL (https://…, presets leave blank)" placeholderTextColor={t.faint}
-                  value={form.baseUrl} onChangeText={(v) => setForm({ ...form, baseUrl: v })} autoCapitalize="none" />
-                <Pressable style={s.primary} onPress={submitAdd} disabled={!form.name.trim() || !form.key.trim() || busy === "add"}>
-                  <Text style={s.primaryLabel}>{busy === "add" ? "Adding…" : "Add provider"}</Text>
-                </Pressable>
-              </View>
-              <Text style={[s.formTitle, { marginHorizontal: 14, marginTop: 14 }]}>Presets</Text>
-              <View style={[s.list, { marginTop: 6 }]}>
-                {Object.entries(grouped).map(([group, items]) => (
-                  <View key={group}>
-                    <Text style={{ ...s.sub, paddingHorizontal: 11, paddingTop: 8, paddingBottom: 2 }}>{group}</Text>
-                    {items.map((p) => (
-                      <Pressable key={p.id} style={s.presetRow}
-                        onPress={() => setForm({ name: p.id, key: "", baseUrl: "" })}>
-                        <Text style={s.presetLabel}>{p.label}</Text>
-                        <Text style={s.presetId}>{p.id}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                ))}
-                {presetList.length === 0 ? (
-                  <View style={[s.empty, { padding: 20 }]}>
-                    <Text style={s.emptySub}>presets unavailable (magpie CLI not found)</Text>
-                  </View>
-                ) : null}
-              </View>
-              <Text style={[s.emptySub, { marginTop: 8, marginHorizontal: 14 }]}>
-                Tap a preset to fill the name; then paste its key above and Add.
-              </Text>
-            </ScrollView>
-          </View>
-        </Modal>
-
-        {/* ---- add group modal ---- */}
-        <Modal visible={showGroupAdd} transparent animationType="fade" onRequestClose={() => setShowGroupAdd(false)}>
-          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,.35)", justifyContent: "center" }}>
-            <View style={s.modalCard}>
-              <Text style={s.formTitle}>Add routing group</Text>
-              <TextInput style={s.input} placeholder="name (e.g. opus-anywhere)" placeholderTextColor={t.faint}
-                value={groupForm.name} onChangeText={(v) => setGroupForm({ ...groupForm, name: v })} />
-              <TextInput style={s.input} placeholder="models (provider/model, comma-separated)" placeholderTextColor={t.faint}
-                value={groupForm.models} onChangeText={(v) => setGroupForm({ ...groupForm, models: v })} autoCapitalize="none" />
-              <TextInput style={s.input} placeholder="routing (smart|order|rotate|usage|pace|weight|free|fast|drain)" placeholderTextColor={t.faint}
-                value={groupForm.routing} onChangeText={(v) => setGroupForm({ ...groupForm, routing: v })} autoCapitalize="none" />
-              <Pressable style={s.primary}
-                disabled={!groupForm.name.trim() || !groupForm.models.trim() || busy === "gadd"}
-                onPress={async () => {
-                  setShowGroupAdd(false);
-                  await run("gadd", () =>
-                    mkGroup({ name: groupForm.name.trim(), models: groupForm.models.trim(), routing: groupForm.routing.trim() || undefined }),
-                  );
-                  setGroupForm({ name: "", models: "", routing: "smart" });
-                }}>
-                <Text style={s.primaryLabel}>Add group</Text>
-              </Pressable>
-              <Pressable style={{ marginTop: 6 }} onPress={() => setShowGroupAdd(false)}>
-                <Text style={{ color: t.muted, fontSize: 12.5, textAlign: "center" }}>Cancel</Text>
-              </Pressable>
-            </View>
-          </View>
-        </Modal>
-
-        {err ? (
-          <View style={s.errBox}>
-            <Text style={s.errText} selectable>{err}</Text>
-          </View>
-        ) : null}
+        </>}
+        {endpoints[page] && <>
+          {!!sectionError && <Text style={{ color: c.red }}>{sectionError}</Text>}
+          {page === "settings" && <View style={{ ...card, ...row }}><Text style={{ ...text, flex: 1 }}>插件外观</Text>{button("浅色", () => setAppearance("light"))}{button("深色", () => setAppearance("dark"))}</View>}
+          <View style={{ ...card, padding: 18, gap: 10 }}><Text style={{ ...text, fontWeight: "600" }}>{label} · 官方接口数据</Text><Text style={muted}>此页正在重建；以下为本机真实数据，尚未达到官方页面的交互与排版。</Text>{section != null && <DataView value={section} color={c.text} muted={c.muted} />}</View>
+        </>}
       </ScrollView>
     </View>
-  );
+    <Modal visible={compact && drawer} transparent animationType="fade" onRequestClose={() => setDrawer(false)}><View style={{ flex: 1, flexDirection: "row", backgroundColor: "rgba(0,0,0,.35)" }}><View style={{ width: 260 }}>{sidebar}</View><Pressable accessibilityLabel="关闭导航" style={{ flex: 1 }} onPress={() => setDrawer(false)} /></View></Modal>
+    {modal(!!picker, () => setPicker(null), `选择模型 · ${picker?.agent.name ?? ""}`, <><TextInput value={query} onChangeText={setQuery} style={input} placeholder="搜索模型" placeholderTextColor={c.muted} />{button("Agent 默认", () => picker && void act("set", { agent: picker.agent.id, field: picker.field.key, value: "" }, () => setPicker(null)))}{picker?.field.options.filter(o => `${o.label} ${o.value} ${o.group}`.toLowerCase().includes(query.toLowerCase())).map(o => <Pressable key={o.value} disabled={busy} onPress={() => void act("set", { agent: picker.agent.id, field: picker.field.key, value: o.value }, () => setPicker(null))} style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: c.line }}><Text style={text}>{o.label || o.value}</Text><Text style={muted}>{o.group || o.note}</Text></Pressable>)}</>)}
+    {modal(!!detail, () => setDetail(null), `${detail?.name ?? ""} · 详情`, <><Text selectable style={muted}>{detail?.path}</Text>{detail?.fields.map(f => <View key={f.key} style={{ gap: 6 }}><Text style={muted}>{f.label}</Text>{button(f.value || "默认", () => { setPicker({ agent: detail, field: f }); setDetail(null); })}</View>)}</>)}
+    {modal(editing, () => setEditing(false), form.id ? "编辑供应商" : "添加供应商", <>
+      {!form.id && <><Text style={muted}>供应商预设</Text><ScrollView horizontal contentContainerStyle={{ gap: 6 }}>{button("自定义中转", () => setForm(freshForm))}{vendors.presets.map(p => button(p.name, () => setForm({ ...freshForm, preset: p.id, name: p.name, url: p.chat || p.anthropic || p.responses || "", protocol: p.chat ? "chat" : p.anthropic ? "anthropic" : "responses" })))}</ScrollView></>}
+      <Text style={muted}>名称</Text><TextInput value={form.name} onChangeText={v => setForm({ ...form, name: v })} style={input} />
+      <Text style={muted}>API Key {form.id ? "（留空保留原密钥）" : ""}</Text><TextInput value={form.key} onChangeText={v => setForm({ ...form, key: v })} style={input} autoCapitalize="none" autoCorrect={false} secureTextEntry />
+      <Text style={muted}>接口协议</Text><View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>{["chat", "anthropic", "responses"].map(p => button(`${form.protocol === p ? "● " : ""}${p}`, () => setForm({ ...form, protocol: p })))}</View>
+      <Text style={muted}>Base URL</Text><TextInput value={form.url} onChangeText={v => setForm({ ...form, url: v })} style={input} autoCapitalize="none" autoCorrect={false} placeholder="https://api.example.com/v1" placeholderTextColor={c.muted} />
+      <Text style={muted}>模型 ID（逗号分隔；编辑留空保留原列表）</Text><TextInput value={form.models} onChangeText={v => setForm({ ...form, models: v })} style={input} autoCapitalize="none" />
+      {button(busy ? "保存中…" : "保存", () => {
+        if (!form.name.trim() || (!form.id && !form.key.trim())) { setError("名称和新供应商 API Key 为必填项"); return; }
+        try { const u = new URL(form.url); if (!["https:", "http:"].includes(u.protocol)) throw new Error(); } catch { setError("请填写有效的 HTTP 或 HTTPS Base URL"); return; }
+        void act("provider/save", { id: form.id || form.name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-") || "relay", name: form.name.trim(), key: form.key.trim(), preset: form.preset, [form.protocol]: form.url.trim(), new: !form.id, ...(form.models.trim() ? { models: form.models.split(",").map(s => s.trim()).filter(Boolean) } : {}) }, () => { setEditing(false); setForm(freshForm); });
+      })}
+      {!!error && <Text selectable style={{ color: c.red }}>{error}</Text>}
+    </>)}
+    {modal(!!confirmDelete, () => setConfirmDelete(null), "删除供应商", <><Text style={text}>删除 {confirmDelete?.name}？依赖此供应商的模型将失去此入口。</Text>{button("确认删除", () => confirmDelete && void act("provider/delete", { id: confirmDelete.id }, () => setConfirmDelete(null)), true)}</>)}
+    {modal(!!confirmDisconnect, () => setConfirmDisconnect(null), "断开接入", <><Text style={text}>将 {confirmDisconnect?.name} 恢复为接入前的配置。</Text>{button("确认断开", () => confirmDisconnect && void act(`agents/disconnect/${confirmDisconnect.id}`, {}, () => setConfirmDisconnect(null)))}</>)}
+    {modal(profileName !== null, () => setProfileName(null), "保存当前方案", <><TextInput style={input} value={profileName ?? ""} onChangeText={setProfileName} placeholder="方案名称" placeholderTextColor={c.muted} />{button("保存", () => profileName?.trim() && void act("profile/save", { name: profileName.trim() }, () => setProfileName(null)))}</>)}
+  </View>;
 }
 
-/** Renders one of magpie's official nav icons ({svg} form) at a size. */
-function SvgIcon({ icon, size, color }: { icon: { svg: string }; size: number; color: string }) {
-  // The icons use stroke="currentColor" — swap to the given color.
-  const svg = icon.svg.replace(/currentColor/g, color);
-  const dataUri = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-  return (
-    <View style={{ width: size, height: size }}>
-      {/* eslint-disable-next-line @typescript-eslint/no-var-requires */}
-      <RNImage source={{ uri: dataUri }} style={{ width: size, height: size }} />
-    </View>
-  );
+/** Bounded structured inspector until each secondary view is implemented. Secrets are never rendered. */
+function DataView({ value, color, muted, depth = 0 }: { value: unknown; color: string; muted: string; depth?: number }) {
+  if (depth > 3) return <Text style={{ color: muted }}>展开结构待实现</Text>;
+  if (value == null) return <Text style={{ color: muted }}>暂无数据</Text>;
+  if (typeof value !== "object") return <Text selectable style={{ color, fontSize: 13 }}>{String(value)}</Text>;
+  const entries = Object.entries(value).filter(([key]) => !/key|token|secret|password|cookie|authorization/i.test(key));
+  return <View style={{ gap: 8 }}>{entries.slice(0, 40).map(([key, v]) => <View key={key} style={{ paddingLeft: depth * 4, gap: 3 }}><Text style={{ color: muted, fontSize: 12 }}>{key}</Text><DataView value={v} color={color} muted={muted} depth={depth + 1} /></View>)}{entries.length > 40 && <Text style={{ color: muted }}>另有 {entries.length - 40} 项，完整列表界面待实现</Text>}</View>;
 }

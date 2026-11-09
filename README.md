@@ -1,70 +1,55 @@
-# paseo-magpie-manager
+# Magpie Manager — Paseo plugin (Windows-layout rebuild)
 
-A [Paseo](https://paseo.sh) plugin that manages a local [magpie](https://github.com/yetone/magpie) gateway — providers, agents, routing groups and quotas — from any Paseo client, **including mobile**, styled 1:1 after magpie's own web UI (same tokens, same segmented view switch, same list cards).
+A Paseo React Native plugin for controlling Magpie on the **Paseo daemon host**.
+Not a standalone website, iframe, or link to the phone's localhost.
 
-```
-Paseo app (desktop / mobile / web)          ← the panel, E2E-encrypted over Paseo's relay
-        ↓ plugin RPC
-magpie-manager server side (on the daemon host)
-        ↓ spawns
-magpie CLI (provider add/rm/set/test, groups, agents, quota --json)
-        ↓ serves
-magpie gateway at 127.0.0.1:3425
-```
+## Architecture
 
-magpie is the backend; this plugin is the management front end.
+Paseo desktop/mobile → plugin screen → authenticated Paseo RPC → server-only
+Magpie HTTP session → local Magpie official API.
 
-## Features
+UI references: `yetone/magpie` commit `c7ebb6f8`, `internal/gui/assets/index.html`,
+`app.css`, `app.js`; API reference: `internal/gui/api.go`, `providers.go`.
+The UI is a native port, not a claim of pixel-identical rendering.
 
-- **Providers** — list / add (preset vendor or custom relay with base URL) / remove / test / replace key
-- **Agents** — every agent CLI magpie detects on the host, its current model, set model
-- **Groups** — routing groups (failover across models/providers): list / add / remove
-- **Quota** — `magpie quota --json`, what's left on every plan and key
-- Presets picker with all vendors magpie knows (77 rows, CN relays included)
-- Light/dark, follows the Paseo theme; magpie web-UI design tokens throughout
+## Rebuild status
 
-## Install
+- Native Chinese navigation, Agent default page, breadcrumb, bottom settings.
+- Narrow screens use a navigation drawer.
+- Agent rows: actual connection status, model picker, details, connect/disconnect
+  confirmation, profiles save/use.
+- Providers: official preset list, custom relay, protocol selection, URL/key,
+  model IDs, edit, test, delete confirmation; failed save retains input.
+- Secondary pages currently expose bounded structured official data and are
+  explicitly labelled **under reconstruction**; their official interactions are
+  not implemented yet. This is not a complete reproduction of Magpie.
+- No desktop/mobile screenshot acceptance yet.
 
-```sh
-paseo plugin add https://github.com/noraluca0lwl-hub/paseo-magpie-manager
-```
+## Setup
 
-Requirements on the daemon host:
+Install Magpie on the same host as Paseo and run its authenticated web service
+on loopback (default `http://127.0.0.1:3430`). Configure the plugin server with:
 
-- `magpie` CLI in `PATH` (or set `MAGPIE_BIN`), e.g. `curl -fsSL https://usemagpie.ai/install.sh | sh`
-- `XDG_RUNTIME_DIR` set for the daemon's user if magpie runs as a systemd --user service (default `/run/user/0` is assumed for root)
+- `MAGPIE_WEB_ORIGIN`: loopback Magpie origin.
+- `MAGPIE_WEB_KEY`: that service's key, only in the daemon environment; or
+  `~/.config/magpie/paseo-web-key` (chmod 600).
 
-Open any agent workspace → the **Magpie** panel (or ⌘K / Ctrl+K → "Magpie Manager").
+The key never goes into the client bundle. The server exposes only explicitly
+allowlisted API paths; errors propagate to the panel.
 
-## Configuration
+Install as a Paseo plugin using the repository or its local directory. The
+existing sidebar, full-screen and workspace entries remain Paseo registrations.
 
-| Env (daemon side) | Default | Purpose |
-|---|---|---|
-| `MAGPIE_BIN` | `/root/.local/bin/magpie` | Path to the magpie CLI |
-| `XDG_RUNTIME_DIR` | `/run/user/0` | Needed by `magpie` when it talks to its systemd service |
-
-## Development
+## Verification
 
 ```sh
-npm install
 npm run typecheck
+node --experimental-strip-types tests/official-api.test.ts
 paseo plugin reload magpie-manager
-paseo plugin logs magpie-manager
 ```
 
-Layout:
+Tests cover server cookie login, concurrent sign-in, GET/POST, upstream errors
+and rejection of paths outside the allowlist. They do not establish visual
+parity or validate mutations of real Agent configuration.
 
-- `shared/contracts.ts` — RPC contracts (zod), the whole API surface
-- `server/magpie-cli.ts` — spawns the magpie CLI, parses its output
-- `index.server.ts` — RPC handlers
-- `client/panel.tsx` — the panel: segmented views, modals, magpie web-UI styling
-- `index.client.tsx` — panel + Command Center registration
-
-## Notes
-
-- The plugin parses magpie's human-readable CLI output where no JSON flag exists (`providers`, `agents`, `groups`). If a magpie update changes those formats, the parsers in `server/magpie-cli.ts` and `index.server.ts` are the place to follow upstream — that is this repo's update path, mirroring magpie releases.
-- Keys are passed to the magpie CLI over the plugin RPC (E2E-encrypted by Paseo) and stored by magpie itself; this plugin keeps nothing.
-
-## License
-
-MIT
+A local `backup/pre-windows-rebuild-*` Git branch preserves the earlier UI.
