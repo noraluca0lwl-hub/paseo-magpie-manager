@@ -32,8 +32,9 @@ export async function runMagpie(args: string[]): Promise<CliResult> {
 
 /**
  * Parse `magpie providers` human output into provider entries.
- * Format sample (one per line):  deepseek   https://api.deepseek.com   3 models   used by claude
- * We keep it tolerant: columns separated by 2+ spaces or tabs.
+ * Real format (verified against magpie 0.1.3370):
+ *   test-relay custom  test-relay  example.com  ● sk-t…ummy  1 models
+ * Columns separated by 2+ spaces; leading spaces trimmed.
  */
 export function parseProviders(raw: string): Array<{
   id: string;
@@ -46,15 +47,30 @@ export function parseProviders(raw: string): Array<{
   for (const line of raw.split("\n")) {
     const t = line.trim();
     if (!t || t.startsWith("no providers") || /^(magpie:|usage:)/.test(t)) continue;
-    const cols = t.split(/\s{2,}|\t+/).map((c) => c.trim()).filter(Boolean);
+    const cols = t.split(/\s{2,}/).map((c) => c.trim()).filter(Boolean);
     if (cols.length === 0) continue;
-    const name = cols[0];
-    if (name === "PROVIDER" || name.toLowerCase() === "provider") continue;
-    const host = cols.find((c) => /^https?:\/\//.test(c)) ?? null;
+    // first column: "<id> <type>" — the id is the first token
+    const id = cols[0].split(/\s+/)[0];
+    if (id.toLowerCase() === "provider") continue;
+    // host column: any col that looks like a hostname/url and isn't the masked key
+    const host =
+      cols.find((c) =>
+        /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(:\d+)?(\/\S*)?$/i.test(c) &&
+        !c.startsWith("sk-"),
+      ) ?? null;
     const modelsCol = cols.find((c) => /^\d+\s+models?$/.test(c));
     const models = modelsCol ? parseInt(modelsCol, 10) : null;
-    const usedBy = cols.filter((c) => c !== name && c !== host && c !== modelsCol);
-    providers.push({ id: name, name, host, models, usedBy });
+    // display name: a column equal to the id repeated (custom relays repeat it);
+    // never a URL, never the models count
+    const name =
+      cols.find((c) => c === id) ??
+      (cols.length > 1 && cols[1] !== id && !/^\d+\s+models?$/.test(cols[1]) && !/[a-z0-9-]+\.[a-z]{2,}/i.test(cols[1]) ? cols[1] : id);
+    // "used by" appears as its own column set when agents reference the provider
+    const usedBy = cols
+      .filter((c) => c !== cols[0] && c !== host && c !== modelsCol && c !== name)
+      .filter((c) => !c.startsWith("●") && !/^sk-/.test(c) && !/^\d+\s+models?$/.test(c))
+      .map((c) => c.replace(/^used by\s+/i, ""));
+    providers.push({ id, name, host, models, usedBy });
   }
   return providers;
 }
