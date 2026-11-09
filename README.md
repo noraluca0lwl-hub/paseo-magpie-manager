@@ -36,7 +36,12 @@ The UI is a native port, not a claim of pixel-identical rendering.
   candidate selection (already-installed entries disabled), Agent selection and
   confirmation. Single-skill updates require explicit replacement confirmation
   for known local edits; removed upstream skills are reported as not updated.
-  Instruction set management and editing other skill files remain pending.
+  Skill editor now lists official text files and caches per-file drafts when
+  switching; modified files save sequentially with their own `was` values.
+  Successful writes are marked saved before retrying remaining files; closing
+  dirty skill drafts requires discard confirmation. Multi-file draft switching
+  and discard/cancel were checked at desktop/mobile light/dark sizes.
+  Instruction set management remains pending.
   Desktop/mobile light/dark browser tests cover editor opening and failed-write
   input retention; no real Agent mutations were performed.
   Browser tests blocked real writes; actual Agent distribution is not yet verified.
