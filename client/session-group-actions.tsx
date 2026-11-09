@@ -14,8 +14,9 @@ export function SessionGroupActions({ cwd, members, colors: c, post, reload, not
   const [preview, setPreview] = useState<{ token?: string; sessions?: number; bytes?: number; from?: string; to?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  const writable = members.filter(s => !s.read_only && !s.undeletable && s.deletable !== false);
+  const writable = members.filter(s => s.deletable === true || (s.deletable !== false && !s.read_only && !s.undeletable));
   const movable = !!cwd && members.length > 0 && members.every(s => s.agent === 'claude' && !s.read_only && !s.gateway) && new Set(members.map(s => s.wsl || '')).size === 1;
+  const moveReason = members.some(s => s.gateway) ? '这是网关调用记录，没有可迁移的 Claude Code 项目文件。请先在会话读取设置中开启本机 Claude Code 会话读取，再选择带工作目录的原生项目。' : !cwd ? '此分组没有项目工作目录，迁移需要带工作目录的 Claude Code 原生项目。' : '此分组不是可迁移的 Claude Code 原生项目，或包含只读会话、不同 WSL 环境。';
   const text = { color: c.text, fontSize: 14 };
   const action = (label: string, fn: () => void, disabled = false) => <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={fn} style={{ padding: 12, opacity: disabled ? 0.45 : 1 }}><Text style={text}>{label}</Text></Pressable>;
   const ask = (kind: 'delete' | 'move') => { setMenu(false); setDialog(kind); setPreview(null); setTo(cwd); setMessage(''); };
@@ -39,18 +40,18 @@ export function SessionGroupActions({ cwd, members, colors: c, post, reload, not
   return <View style={{ position: 'relative', zIndex: menu ? 100 : 1 }}>
     <Pressable accessibilityRole="button" accessibilityLabel="项目会话更多操作" onPress={() => setMenu(v => !v)} style={{ padding: 12 }}><Text style={{ color: c.muted, fontSize: 22 }}>⋯</Text></Pressable>
     {menu && <View style={{ position: 'absolute', right: 0, top: 44, width: 232, backgroundColor: c.card, borderColor: c.line, borderWidth: 1, borderRadius: 12, padding: 4, elevation: 12, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 12 }}>
-      {action('→  迁移项目会话', () => ask('move'), !movable)}
+      {action('→  迁移项目会话', () => { ask('move'); if (!movable) setMessage(moveReason); })}
       <View style={{ height: 1, backgroundColor: c.line }}/>
-      {action('删除全部会话', () => ask('delete'), !writable.length)}
+      {action('删除全部会话', () => { ask('delete'); if (!writable.length) setMessage('后端未提供此分组的删除权限。'); })}
       {action('关闭菜单', () => setMenu(false))}
     </View>}
     <Modal visible={dialog !== null} transparent animationType="fade" onRequestClose={() => { if (!busy) setDialog(null); }}><View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,.4)', justifyContent: 'center', padding: 20 }}><View style={{ width: '100%', maxWidth: 520, alignSelf: 'center', backgroundColor: c.card, borderRadius: 14, padding: 20, gap: 12 }}>
       <Text style={{ ...text, fontWeight: '600', fontSize: 17 }}>{dialog === 'delete' ? `删除此分组的 ${writable.length} 个会话？` : '迁移 Claude Code 项目会话'}</Text>
       <Text selectable style={{ color: c.muted }}>{cwd || '未命名会话'}</Text>
       <Text style={{ color: c.muted }}>{dialog === 'delete' ? `按完整分组操作，包含被搜索隐藏的会话；移入回收站后可恢复。${members.length - writable.length ? `保留 ${members.length - writable.length} 个只读会话。` : ''}` : '先关闭此项目的 Claude Code 和编辑器会话。迁移整个项目的会话，保留原始文件与恢复清单，不覆盖目标存储，不改历史消息文本。'}</Text>
-      {dialog === 'move' && <TextInput accessibilityLabel="新的项目绝对路径" editable={!busy} value={to} onChangeText={v => { setTo(v); setPreview(null); setMessage(''); }} style={{ ...text, backgroundColor: c.pill, borderRadius: 8, padding: 12 }}/>}
+      {dialog === 'move' && movable && <TextInput accessibilityLabel="新的项目绝对路径" editable={!busy} value={to} onChangeText={v => { setTo(v); setPreview(null); setMessage(''); }} style={{ ...text, backgroundColor: c.pill, borderRadius: 8, padding: 12 }}/>}
       {!!message && <Text selectable style={text}>{message}</Text>}
-      <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>{action('取消', () => setDialog(null), busy)}{action(busy ? '处理中…' : dialog === 'delete' ? '确认删除全部' : preview ? '确认迁移' : '预览迁移', () => void execute(), busy || (dialog === 'move' && (!to.trim() || to.trim() === cwd)))}</View>
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>{action('取消', () => setDialog(null), busy)}{action(busy ? '处理中…' : dialog === 'delete' ? '确认删除全部' : preview ? '确认迁移' : '预览迁移', () => void execute(), busy || (dialog === 'delete' ? !writable.length : !movable || !to.trim() || to.trim() === cwd))}</View>
     </View></View></Modal>
   </View>;
 }
