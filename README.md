@@ -14,6 +14,15 @@ The UI is a native port, not a claim of pixel-identical rendering.
 
 ## Rebuild status
 
+- Gateway now reads `providers.gateway`, not the unrelated upstream-status feed.
+  Includes live state/address, sharing change confirmation, five API curl examples,
+  enabled-model search/selection, paginated recent calls and on-demand request bodies
+  with authorization-bearing JSON fields masked. Uses Paseo's client clipboard API.
+  LAN key list/create/enable/disable/reveal/rotate/delete are connected; rotate/delete
+  require confirmation. Advanced key budgets, access restrictions, SDK examples and
+  exact Windows visual parity remain outstanding. Real Linux state, model enumeration,
+  recent-call body and key-list reads verified; mutations are fixture-tested only.
+
 - Native Chinese navigation, Agent default page, breadcrumb, bottom settings.
 - Narrow screens use a navigation drawer.
 - Agent rows: actual connection status, model picker, details, connect/disconnect

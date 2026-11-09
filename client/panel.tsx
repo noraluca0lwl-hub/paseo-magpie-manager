@@ -31,7 +31,7 @@ const nav: { group: string; items: { id: Page; label: string; icon: { svg: strin
   { group: "观测", items: [{ id: "usage", label: "用量", icon: I_usage }, { id: "masking", label: "脱敏", icon: I_masking }] },
   { group: "扩展", items: [{ id: "plugins", label: "插件", icon: I_plugins }] },
 ];
-const endpoints: Partial<Record<Page, string>> = { sessions: "sessions", library: "library", routing: "groups", gateway: "upstream", usage: "usage/quotas", masking: "masking/summary", plugins: "plugins", settings: "settings" };
+const endpoints: Partial<Record<Page, string>> = { sessions: "sessions", library: "library", routing: "groups", gateway: "providers", usage: "usage/quotas", masking: "masking/summary", plugins: "plugins", settings: "settings" };
 const freshForm = { id: "", name: "", key: "", url: "", protocol: "chat", preset: "", models: "", icon: "", iconFrom: "" };
 
 export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme">) {
