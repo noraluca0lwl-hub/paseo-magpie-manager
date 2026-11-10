@@ -2,8 +2,13 @@
  * server/magpie-cli.ts — spawn the local `magpie` CLI and return stdout/stderr.
  */
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
-const MAGPIE_BIN = process.env.MAGPIE_BIN ?? "/root/.local/bin/magpie";
+// The official installer uses a user-local binary on Linux; otherwise use PATH.
+const localMagpie = join(homedir(), ".local", "bin", "magpie");
+const MAGPIE_BIN = process.env.MAGPIE_BIN || (existsSync(localMagpie) ? localMagpie : "magpie");
 const TIMEOUT_MS = 20_000;
 
 export interface CliResult {

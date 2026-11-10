@@ -27,16 +27,82 @@ Magpie Web 密钥仅由服务端读取，不打入客户端。接口桥接使用
 
 ## 安装与配置
 
-1. 在 **Paseo daemon 所在主机**安装 [Magpie 官方版本（下载页）](https://github.com/yetone/magpie-releases/releases/latest)；安装说明见 [Magpie 官方文档](https://usemagpie.ai/docs/start)。本插件只提供 Paseo 内的管理面板，Magpie 本体需另行安装。启动 Magpie 的本机认证服务，默认 `http://127.0.0.1:3430`；该地址仅供插件服务端调用，面板在 Paseo 内打开。
-2. 在 daemon 环境设置 `MAGPIE_WEB_ORIGIN` 和 `MAGPIE_WEB_KEY`；密钥也可保存在 `~/.config/magpie/paseo-web-key`，文件权限 `600`。
-3. 从 GitHub 安装 Paseo 插件：`paseo plugin add git:noraluca0lwl-hub/paseo-magpie-manager`；已有本地目录安装也可沿用。
-4. 重新加载：
+插件只提供 **Paseo 内的管理面板**；Magpie 本体、它的本机管理 API 与模型网关仍由 Magpie 提供。以下命令都在 **运行 Paseo daemon 的同一台机器、同一个系统用户** 下执行，不需要复制别人的供应商配置或密钥。Magpie 官方版本：[下载页](https://github.com/yetone/magpie-releases/releases/latest) · [安装文档](https://usemagpie.ai/docs/start)。
 
-```sh
-XDG_RUNTIME_DIR=/run/user/0 paseo plugin reload magpie-manager
+### Linux 服务器（无桌面）
+
+1. 安装 Magpie 终端版本；安装完成后确认命令位置：
+
+   ```bash
+   curl -fsSL https://usemagpie.ai/install.sh | sh -s -- --tui
+   export PATH="$HOME/.local/bin:$PATH"
+   command -v magpie
+   magpie --version
+   ```
+
+   插件按顺序使用 `MAGPIE_BIN` 指定的路径、`~/.local/bin/magpie`、系统 `PATH` 里的 `magpie`。`~` 是 **Paseo daemon 运行用户** 的家目录，不是插件开发者的 `/root`。终端版本的界面无需常驻；下面由服务保持 Magpie 运行。
+
+2. 启动带认证的 **本机** Magpie 管理 API 和模型网关。插件调用 `/api/*`，因此后台服务必须开启 `--web`；裸 `magpie serve` 缺少面板所需的管理接口。服务监听 `127.0.0.1`，无需向外公开 3430 端口：
+
+   ```bash
+   mkdir -p ~/.config/magpie ~/.config/systemd/user
+   chmod 700 ~/.config/magpie
+   magpie daemon install --web --addr 127.0.0.1:3430
+   systemctl --user enable --now magpie.service
+   magpie daemon status  # 输出包含本机登录链接：勿分享或粘贴其完整内容
+   ```
+
+   若这台机器在退出登录后停止用户级 systemd 服务，由管理员为该用户开启 linger：`sudo loginctl enable-linger "$(id -un)"`。Windows/macOS 版本的安装与服务管理按 [Magpie 官方文档](https://usemagpie.ai/docs/start) 操作；Paseo 与 Magpie 仍运行于同一用户账户下。
+
+3. 把 Magpie 服务使用的 **同一把** `MAGPIE_WEB_KEY` 存给插件服务端。先在当前终端设置密钥，服务通过用户级 systemd 环境文件读取它；插件读取 `~/.config/magpie/paseo-web-key`。以下密钥在同一用户的同一主机本地生成，不上传仓库：
+
+   ```bash
+   install -d -m 700 ~/.config/magpie
+   MAGPIE_WEB_KEY="$(openssl rand -hex 32)"
+   umask 077
+   printf '%s\n' "MAGPIE_WEB_KEY=$MAGPIE_WEB_KEY" > ~/.config/magpie/paseo-web.env
+   printf '%s' "$MAGPIE_WEB_KEY" > ~/.config/magpie/paseo-web-key
+   chmod 600 ~/.config/magpie/paseo-web.env ~/.config/magpie/paseo-web-key
+   # 沿用官方服务的 ExecStart，仅注入密钥文件。
+   install -d -m 700 ~/.config/systemd/user/magpie.service.d
+   printf '[Service]\nEnvironmentFile=%s/.config/magpie/paseo-web.env\n' "$HOME" > ~/.config/systemd/user/magpie.service.d/10-paseo-key.conf
+   systemctl --user daemon-reload
+   systemctl --user restart magpie.service
+   unset MAGPIE_WEB_KEY
+   ```
+
+   已有 Magpie 服务且已有 `MAGPIE_WEB_KEY` 时，沿用原密钥并写入上述两个文件，避免其他正在使用的客户端会话失效。密钥也能通过 Paseo daemon 环境变量 `MAGPIE_WEB_KEY` 提供，后者优先。`MAGPIE_WEB_ORIGIN` 默认为 `http://127.0.0.1:3430`，仅在修改本机监听地址时设置。文件和服务都以 **daemon 运行用户** 读写。
+
+4. 安装 GitHub 插件并打开 Paseo 面板：
+
+   ```bash
+   paseo plugin add git:noraluca0lwl-hub/paseo-magpie-manager
+   paseo plugin ls
+   paseo plugin reload magpie-manager
+   ```
+
+   Paseo 插件安装在该 daemon 自身的插件目录，具体安装路径由 Paseo 管理，无需手建或复制 `~/.paseo/plugins`。Paseo 客户端的侧边栏选择 **Magpie** 即可管理这台机器。插件面板通过 Paseo RPC 访问同机 Magpie，浏览器不用打开 3430；但当前版本的后台管理 API 仍由 `magpie web` 提供，关闭它会使面板失效。
+
+### 路径、环境变量和验证
+
+| 项目 | 路径或值 | 用途 |
+|---|---|---|
+| Magpie 程序 | `MAGPIE_BIN` → `~/.local/bin/magpie` → `PATH` | 插件服务端执行 Magpie CLI |
+| Magpie 配置 | `~/.config/magpie/` | 由 Magpie 保存供应商与服务设置；勿复制他人的配置 |
+| 插件登录密钥 | `~/.config/magpie/paseo-web-key`（`0600`） | 必须与 Magpie 服务的 `MAGPIE_WEB_KEY` 一致 |
+| 服务环境文件 | `~/.config/magpie/paseo-web.env`（`0600`） | systemd 用户服务读取同一密钥 |
+| 服务覆写文件 | `~/.config/systemd/user/magpie.service.d/10-paseo-key.conf` | 保留官方 ExecStart，只注入 EnvironmentFile |
+| 本机管理 API | `MAGPIE_WEB_ORIGIN`，默认 `http://127.0.0.1:3430` | 仅插件服务端访问；不面向手机或公网 |
+| 模型网关 | `http://127.0.0.1:3425/v1` | Magpie 模型请求通道，与面板管理 API 分离 |
+| 插件目录 | Paseo 自行管理 | `paseo plugin ls` 可查实际安装位置 |
+
+```bash
+magpie daemon status
+paseo plugin ls
+paseo plugin logs magpie-manager
 ```
 
-`XDG_RUNTIME_DIR` 按 daemon 的运行用户调整。
+查看 `paseo plugin logs` 的 `Plugin ready` 仅验证服务端加载；最终还需在 Paseo 侧边栏打开 Magpie，检查供应商列表与编辑、移除按钮。
 
 ## 测试
 
