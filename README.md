@@ -27,9 +27,9 @@ Magpie Web 密钥仅由服务端读取，不打入客户端。接口桥接使用
 
 ## 安装与配置
 
-1. 在 Paseo daemon 同机安装 Magpie，启动本机认证 Web 服务，默认 `http://127.0.0.1:3430`。
+1. 在 **Paseo daemon 所在主机**安装 [Magpie 官方版本（下载页）](https://github.com/yetone/magpie-releases/releases/latest)；安装说明见 [Magpie 官方文档](https://usemagpie.ai/docs/start)。本插件只提供 Paseo 内的管理面板，Magpie 本体需另行安装。启动 Magpie 的本机认证服务，默认 `http://127.0.0.1:3430`；该地址仅供插件服务端调用，面板在 Paseo 内打开。
 2. 在 daemon 环境设置 `MAGPIE_WEB_ORIGIN` 和 `MAGPIE_WEB_KEY`；密钥也可保存在 `~/.config/magpie/paseo-web-key`，文件权限 `600`。
-3. 以本仓库或本地目录安装 Paseo 插件。
+3. 从 GitHub 安装 Paseo 插件：`paseo plugin add git:noraluca0lwl-hub/paseo-magpie-manager`；已有本地目录安装也可沿用。
 4. 重新加载：
 
 ```sh
