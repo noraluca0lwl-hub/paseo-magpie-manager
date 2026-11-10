@@ -104,7 +104,8 @@ export default function contribute(server: PluginServerContext) {
     } catch {
       up = false;
     }
-    return { url: "http://127.0.0.1:3430/?k=blackflag-magpie-panel-2026", up };
+    // Compatibility RPC: never return an authentication-bearing URL.
+    return { url: "http://127.0.0.1:3430/", up };
   });
 
   server.handle(quotaJson, async () => {
