@@ -2,6 +2,22 @@
 
 通过 Paseo 桌面／手机管理 **Paseo daemon 所在主机**上的 Magpie。插件使用 React Native，不是独立网站，也不会让手机访问手机自身的 localhost。
 
+## 界面展示
+
+以下截图展示 Paseo 内的 Magpie 管理面板；模型和路由条目仅展示截图当时的界面状态。
+
+### Agent 管理
+
+![Paseo 内 Magpie Agent 管理页面](docs/screenshots/agent.png)
+
+### 资源库与指令
+
+![Paseo 内 Magpie 资源库的指令页面](docs/screenshots/library.png)
+
+### 路由组与模板
+
+![Paseo 内 Magpie 路由组与模板页面](docs/screenshots/routing.png)
+
 ## 架构
 
 Paseo 客户端 → 插件页面 → Paseo 认证 RPC → 插件服务端 → 本机 Magpie 官方 HTTP API。
