@@ -81,6 +81,7 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
   const [confirmDisconnect, setConfirmDisconnect] = useState<Agent | null>(null);
   const [profileName, setProfileName] = useState<string | null>(null);
   const [section, setSection] = useState<unknown>(null);
+  const [sectionPage, setSectionPage] = useState<Page | null>(null);
   const [sectionError, setSectionError] = useState("");
   const [search, setSearch] = useState("");const [maskAccounts,setMaskAccounts]=useState(true);
   const generation = useRef(0);
@@ -98,7 +99,7 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
     else setError(String(results[0].reason));
     if (results[1].status === "fulfilled") setVendors(results[1].value as Providers);
     else setError(e => [e, String(results[1].status === "rejected" ? results[1].reason : "")].filter(Boolean).join("\n"));
-    if (results[2].status === "fulfilled") setSection(results[2].value);
+    if (results[2].status === "fulfilled") { setSection(results[2].value); setSectionPage(page); }
     else setSectionError(String(results[2].reason));
     setLoading(false);
   }, [call, page]);
@@ -189,7 +190,7 @@ export function MagpieManagerPanel({ theme }: Pick<PluginAgentPanelProps, "theme
         {endpoints[page] && <>
           {!!sectionError && <Text style={{ color: c.red }}>{sectionError}</Text>}
           {page === "settings" && <View style={{ ...card, ...row }}><Text style={{ ...text, flex: 1 }}>插件外观</Text>{([ ["system", "跟随 Paseo"], ["light", "浅色"], ["dark", "暗色"] ] as const).map(([value, title]) => <View key={value}>{button(`${appearance === value ? "● " : ""}${title}`, () => void saveAppearance(value))}</View>)}</View>}
-          {!sectionError && <SecondaryPage key={page} page={page} data={section} colors={c} usageTab={usageTab} act={secondaryAct} read={secondaryRead} />}
+          {!sectionError && <SecondaryPage key={page} page={page} data={sectionPage === page ? section : null} colors={c} usageTab={usageTab} act={secondaryAct} read={secondaryRead} />}
         </>}
       </ScrollView>
     </View>

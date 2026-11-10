@@ -132,7 +132,15 @@ python3 /tmp/magpie-panel-preview/test-session-gateway-actions.py
 
 完整初跑和复核日志：本机 `/tmp/magpie-full-regression/`。截图：本机 `/tmp/magpie-panel-preview/screenshots/`。这些临时文件未上传，跨主机复现浏览器测试仍需整理预览依赖、RPC fixtures 和浏览器路径；仓库内四组测试与 live 脚本不依赖该工作区。
 
-## 8. 后续确定项
+## 8. 补充：跨页面进入资源库崩溃
+
+- 用户反馈后新增“设置 → 资源库”真实返回结构浏览器复现，捕获 `Cannot read properties of undefined (reading 'sets')`。
+- 根因：页面切换首帧仍使用上一页的 `section`，资源库在新请求完成前读取设置数据的 `instructions.sets`；之前从 Agent 首页直接进入的用例未覆盖这个状态。
+- 修复：为 section 绑定所属页面，仅在 `sectionPage === page` 时向子页面传数据，否则显示读取状态；请求 generation 检查继续阻止过期响应。
+- 复验：1244/390 两种宽度的“设置 → 资源库”均无 pageerror；资源库指令、技能导入失败保留、RTK 页面回归均通过；类型检查、四组仓库测试、差异检查通过。
+- 本机新增回归：`/tmp/magpie-panel-preview/test-library-navigation.py`。手机 App 实机仍待验收。
+
+## 9. 后续确定项
 
 1. 优先定位 390px 会话详情点击超时，增加命中区域和展开状态证据。
 2. 用现行成员选择器重写模板测试，替换已失效的单模型高级／旧月历／旧概览脚本。
